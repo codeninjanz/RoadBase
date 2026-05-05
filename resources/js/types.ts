@@ -32,7 +32,6 @@ export interface SpeedLimitZoneFeature {
         rca: string | null;
         speed_limit_kmh: number | null;
         speed_limit_type: string | null;
-        nzgttm_level: NzgttmLevel | null;
     };
 }
 

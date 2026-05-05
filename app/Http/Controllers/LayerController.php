@@ -81,7 +81,6 @@ class LayerController extends Controller
                 rs.rca,
                 rs.speed_limit_kmh,
                 rs.speed_limit_type,
-                rs.nzgttm_level,
                 ST_AsGeoJSON(ST_Simplify(rs.geom, ?)) AS geojson
             FROM road_segments rs
             WHERE rs.kind = ?
@@ -105,7 +104,6 @@ class LayerController extends Controller
                     'rca' => $row->rca,
                     'speed_limit_kmh' => $row->speed_limit_kmh !== null ? (int) $row->speed_limit_kmh : null,
                     'speed_limit_type' => $row->speed_limit_type,
-                    'nzgttm_level' => $row->nzgttm_level,
                 ],
             ], $rows),
         ]);
