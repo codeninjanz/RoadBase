@@ -46,7 +46,11 @@ class ImportRcasFromGeoJsonCommand extends Command
         }
 
         $features = $fc['features'] ?? [];
-        $this->info("Loading {$source->name}: ".count($features).' features.');
+        $sourceSrid = $this->detectSrid($fc);
+        $this->info("Loading {$source->name}: ".count($features)." features (source SRID {$sourceSrid}).");
+        if ($sourceSrid !== 4326) {
+            $this->info("Reprojecting from EPSG:{$sourceSrid} → EPSG:4326 via MySQL ST_Transform.");
+        }
 
         $upserted = 0;
         $failed = 0;
@@ -81,16 +85,20 @@ class ImportRcasFromGeoJsonCommand extends Command
                     $geom = ['type' => 'MultiPolygon', 'coordinates' => [$geom['coordinates']]];
                 }
 
+                $geomExpr = $sourceSrid === 4326
+                    ? 'ST_GeomFromGeoJSON(?, 1, 4326)'
+                    : "ST_Transform(ST_GeomFromGeoJSON(?, 1, {$sourceSrid}), 4326)";
+
                 DB::statement(
-                    'INSERT INTO rcas (data_source_id, external_id, code, name, kind, raw_payload, synced_at, created_at, updated_at, geom)
-                     VALUES (?, ?, ?, ?, "territorial_authority", ?, NOW(), NOW(), NOW(), ST_GeomFromGeoJSON(?, 1, 4326))
+                    "INSERT INTO rcas (data_source_id, external_id, code, name, kind, raw_payload, synced_at, created_at, updated_at, geom)
+                     VALUES (?, ?, ?, ?, 'territorial_authority', ?, NOW(), NOW(), NOW(), {$geomExpr})
                      ON DUPLICATE KEY UPDATE
                          code = VALUES(code),
                          name = VALUES(name),
                          raw_payload = VALUES(raw_payload),
                          synced_at = NOW(),
                          updated_at = NOW(),
-                         geom = VALUES(geom)',
+                         geom = VALUES(geom)",
                     [
                         $source->id, $externalId, $code, $name,
                         json_encode($props, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
@@ -116,6 +124,28 @@ class ImportRcasFromGeoJsonCommand extends Command
         ]);
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Read the source CRS off a FeatureCollection. Hub-served GeoJSON often
+     * carries EPSG:2193 (NZGD2000) — MySQL ST_Transform reprojects to
+     * EPSG:4326 at insert time.
+     *
+     * @param array<string, mixed> $fc
+     */
+    private function detectSrid(array $fc): int
+    {
+        $name = $fc['crs']['properties']['name'] ?? '';
+        if (! is_string($name) || $name === '') {
+            return 4326; // GeoJSON default per RFC 7946.
+        }
+        if (preg_match('/EPSG[:_](\d+)/i', $name, $m)) {
+            return (int) $m[1];
+        }
+        if (preg_match('/CRS84/i', $name)) {
+            return 4326;
+        }
+        return 4326;
     }
 
     /** @param array<string, mixed> $props @param array<int, string> $keys */
