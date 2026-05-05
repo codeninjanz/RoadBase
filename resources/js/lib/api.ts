@@ -1,4 +1,4 @@
-import type { FeatureCollection, SegmentFeature, SiteDetail, SiteFeature } from '@/types';
+import type { FeatureCollection, SiteDetail, SiteFeature, SpeedLimitZoneFeature } from '@/types';
 
 export type Bbox = [number, number, number, number];
 
@@ -19,14 +19,9 @@ export function fetchSites(b: Bbox, z: number, signal?: AbortSignal) {
     );
 }
 
-export function fetchSegments(
-    b: Bbox,
-    z: number,
-    kind: 'aadt_line' | 'speed_limit',
-    signal?: AbortSignal,
-) {
-    return getJson<FeatureCollection<SegmentFeature>>(
-        `/api/layers/segments?bbox=${bboxParam(b)}&z=${z}&kind=${kind}`,
+export function fetchSpeedLimitZones(b: Bbox, z: number, signal?: AbortSignal) {
+    return getJson<FeatureCollection<SpeedLimitZoneFeature>>(
+        `/api/layers/segments?bbox=${bboxParam(b)}&z=${z}&kind=speed_limit`,
         signal,
     );
 }

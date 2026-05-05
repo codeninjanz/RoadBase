@@ -63,9 +63,11 @@ class LayerController extends Controller
     public function segments(Request $request): JsonResponse
     {
         [$minLng, $minLat, $maxLng, $maxLat] = $this->parseBbox($request);
-        $kind = $request->string('kind')->whenIn(['aadt_line', 'speed_limit'])->toString();
+        // Currently only NSLR speed-limit zones are ingested. Kind kept as a
+        // param so future line/segment sources can plug in without API churn.
+        $kind = $request->string('kind', 'speed_limit')->whenIn(['speed_limit'])->toString();
         if ($kind === '') {
-            return response()->json(['error' => 'kind must be aadt_line or speed_limit'], 422);
+            return response()->json(['error' => 'kind must be speed_limit'], 422);
         }
 
         $zoom = (int) $request->integer('z', 12);
@@ -75,8 +77,10 @@ class LayerController extends Controller
             SELECT
                 rs.id,
                 rs.road_name,
-                rs.aadt,
+                rs.zone_name,
+                rs.rca,
                 rs.speed_limit_kmh,
+                rs.speed_limit_type,
                 rs.nzgttm_level,
                 ST_AsGeoJSON(ST_Simplify(rs.geom, ?)) AS geojson
             FROM road_segments rs
@@ -97,8 +101,10 @@ class LayerController extends Controller
                 'properties' => [
                     'id' => $row->id,
                     'road_name' => $row->road_name,
-                    'aadt' => $row->aadt !== null ? (int) $row->aadt : null,
+                    'zone_name' => $row->zone_name,
+                    'rca' => $row->rca,
                     'speed_limit_kmh' => $row->speed_limit_kmh !== null ? (int) $row->speed_limit_kmh : null,
+                    'speed_limit_type' => $row->speed_limit_type,
                     'nzgttm_level' => $row->nzgttm_level,
                 ],
             ], $rows),

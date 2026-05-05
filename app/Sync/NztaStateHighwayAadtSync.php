@@ -4,7 +4,20 @@ namespace App\Sync;
 
 use App\Models\DataSource;
 use App\Models\SyncRun;
+use Illuminate\Support\Carbon;
 
+/**
+ * Sync NZTA's State Highway Traffic Monitoring Sites (Assets_SHTrafficMonitoringSites).
+ * This is the authoritative source of annual AADT for state-highway count locations
+ * and is the primary data feeding RoadBase's NZGTTM classification for SH roads.
+ *
+ * Key fields (verified against the live FeatureServer):
+ *   siteref, region, sh, rs, rp, description, lane, type, sitetype,
+ *   percentheavy, aadt5yearsago … aadt1yearago, OBJECTID
+ *
+ * `aadt1yearago` is the most recent published annual AADT, which we treat as the
+ * site's current AADT. Older years are kept in raw_payload for trend analysis.
+ */
 class NztaStateHighwayAadtSync extends AbstractSyncJob
 {
     public static function sourceKey(): string
@@ -14,84 +27,59 @@ class NztaStateHighwayAadtSync extends AbstractSyncJob
 
     protected function runSync(SyncRun $run, DataSource $source): void
     {
+        $url = config('services.nzta_aadt.sites_url');
+        if (! $url) {
+            $run->update(['records_upserted' => 0, 'records_failed' => 0]);
+            return;
+        }
+
+        $client = new ArcgisFeatureClient(featureUrl: $url);
+
         $upserted = 0;
         $failed = 0;
 
-        // Point sites — annual AADT count locations.
-        if ($sitesUrl = config('services.nzta_aadt.sites_url')) {
-            foreach ((new ArcgisFeatureClient($sitesUrl))->features() as $feature) {
-                try {
-                    $attrs = $feature['attributes'] ?? [];
-                    $geom = $feature['geometry'] ?? null;
+        foreach ($client->features() as $feature) {
+            try {
+                $props = $feature['properties'] ?? [];
+                $geom = $feature['geometry'] ?? null;
 
-                    $externalId = (string) ($attrs['siteId'] ?? $attrs['SITE_ID'] ?? $attrs['OBJECTID'] ?? '');
-                    if ($externalId === '' || ! isset($geom['x'], $geom['y'])) {
-                        $failed++;
-                        continue;
-                    }
-
-                    SiteUpsert::upsert(
-                        $source->id,
-                        $externalId,
-                        (float) $geom['x'],
-                        (float) $geom['y'],
-                        [
-                            'road_name' => $attrs['roadName'] ?? $attrs['SH_NAME'] ?? null,
-                            'aadt' => self::intOrNull($attrs['aadt'] ?? $attrs['AADT'] ?? null),
-                            'heavy_vehicle_pct' => self::floatOrNull($attrs['heavyPct'] ?? $attrs['HEAVY_PCT'] ?? null),
-                            'raw_payload' => $attrs,
-                            'synced_at' => now(),
-                        ]
-                    );
-                    $upserted++;
-                } catch (\Throwable) {
+                if (! $geom || ($geom['type'] ?? '') !== 'Point') {
                     $failed++;
+                    continue;
                 }
-            }
-        }
+                [$lng, $lat] = $geom['coordinates'];
 
-        // Estimated AADT lines between sites.
-        if ($linesUrl = config('services.nzta_aadt.lines_url')) {
-            foreach ((new ArcgisFeatureClient($linesUrl))->features() as $feature) {
-                try {
-                    $attrs = $feature['attributes'] ?? [];
-                    $paths = $feature['geometry']['paths'] ?? [];
-
-                    if (empty($paths)) {
-                        $failed++;
-                        continue;
-                    }
-
-                    $longest = Geometry::longestPath($paths);
-                    $wkt = Geometry::lineStringWkt($longest);
-                    if ($wkt === null) {
-                        $failed++;
-                        continue;
-                    }
-
-                    $externalId = (string) ($attrs['OBJECTID'] ?? $attrs['segmentId'] ?? '');
-                    if ($externalId === '') {
-                        $failed++;
-                        continue;
-                    }
-
-                    SegmentUpsert::upsert(
-                        $source->id,
-                        $externalId,
-                        'aadt_line',
-                        $wkt,
-                        [
-                            'road_name' => $attrs['roadName'] ?? $attrs['SH_NAME'] ?? null,
-                            'aadt' => self::intOrNull($attrs['aadt'] ?? $attrs['AADT'] ?? null),
-                            'heavy_vehicle_pct' => self::floatOrNull($attrs['heavyPct'] ?? $attrs['HEAVY_PCT'] ?? null),
-                            'raw_payload' => $attrs,
-                            'synced_at' => now(),
-                        ]
-                    );
-                    $upserted++;
-                } catch (\Throwable) {
+                $externalId = (string) ($props['siteref'] ?? $props['OBJECTID'] ?? '');
+                if ($externalId === '') {
                     $failed++;
+                    continue;
                 }
+
+                $aadt = self::intOrNull($props['aadt1yearago'] ?? null);
+                $description = self::stringOrNull($props['description'] ?? null);
+                $sh = self::stringOrNull($props['sh'] ?? null);
+                $roadName = $sh ? "SH{$sh}".($description ? " — {$description}" : '') : $description;
+
+                SiteUpsert::upsert(
+                    $source->id,
+                    $externalId,
+                    (float) $lng,
+                    (float) $lat,
+                    [
+                        'road_name' => $roadName,
+                        'region' => self::stringOrNull($props['region'] ?? null),
+                        'aadt' => $aadt,
+                        'heavy_vehicle_pct' => self::floatOrNull($props['percentheavy'] ?? null),
+                        // No explicit count_date in this dataset; use the start of the
+                        // calendar year before "now" — matches "1 year ago" semantics.
+                        'count_date' => Carbon::now()->subYear()->startOfYear()->toDateString(),
+                        'raw_payload' => $props,
+                        'synced_at' => now(),
+                    ]
+                );
+                $upserted++;
+            } catch (\Throwable) {
+                $failed++;
             }
         }
 
@@ -99,6 +87,11 @@ class NztaStateHighwayAadtSync extends AbstractSyncJob
             'records_upserted' => $upserted,
             'records_failed' => $failed,
         ]);
+    }
+
+    private static function stringOrNull(mixed $v): ?string
+    {
+        return is_string($v) && $v !== '' ? $v : null;
     }
 
     private static function intOrNull(mixed $v): ?int

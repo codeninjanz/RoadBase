@@ -1,20 +1,19 @@
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
 import { useEffect, useRef, useState } from 'react';
 import type { Bbox } from '@/lib/api';
-import { fetchSegments, fetchSites } from '@/lib/api';
+import { fetchSites, fetchSpeedLimitZones } from '@/lib/api';
 import { colourFor } from '@/lib/nzgttm';
-import type { FeatureCollection, NzgttmLevel, SegmentFeature, SiteFeature } from '@/types';
+import type { FeatureCollection, SiteFeature, SpeedLimitZoneFeature } from '@/types';
 
 interface Props {
     apiKey: string | null;
     onSelect: (siteId: number) => void;
     showSpeedLimits: boolean;
-    showAadtLines: boolean;
 }
 
 const NZ_CENTRE = { lat: -41.0, lng: 174.0 };
 
-export function MapView({ apiKey, onSelect, showSpeedLimits, showAadtLines }: Props) {
+export function MapView({ apiKey, onSelect, showSpeedLimits }: Props) {
     if (!apiKey) {
         return (
             <div className="flex h-full items-center justify-center bg-gray-50 text-center text-sm text-gray-600">
@@ -36,11 +35,7 @@ export function MapView({ apiKey, onSelect, showSpeedLimits, showAadtLines }: Pr
                 disableDefaultUI={false}
                 style={{ width: '100%', height: '100%' }}
             >
-                <BboxLayers
-                    onSelect={onSelect}
-                    showSpeedLimits={showSpeedLimits}
-                    showAadtLines={showAadtLines}
-                />
+                <BboxLayers onSelect={onSelect} showSpeedLimits={showSpeedLimits} />
             </Map>
         </APIProvider>
     );
@@ -49,16 +44,13 @@ export function MapView({ apiKey, onSelect, showSpeedLimits, showAadtLines }: Pr
 function BboxLayers({
     onSelect,
     showSpeedLimits,
-    showAadtLines,
 }: {
     onSelect: (id: number) => void;
     showSpeedLimits: boolean;
-    showAadtLines: boolean;
 }) {
     const map = useMap();
     const [sites, setSites] = useState<FeatureCollection<SiteFeature> | null>(null);
-    const [aadtLines, setAadtLines] = useState<FeatureCollection<SegmentFeature> | null>(null);
-    const [speedLimits, setSpeedLimits] = useState<FeatureCollection<SegmentFeature> | null>(null);
+    const [zones, setZones] = useState<FeatureCollection<SpeedLimitZoneFeature> | null>(null);
 
     const debounceRef = useRef<number | null>(null);
 
@@ -78,30 +70,22 @@ function BboxLayers({
                 fetchSites(bbox, zoom, ac.signal)
                     .then(setSites)
                     .catch(() => {});
-                if (showAadtLines) {
-                    fetchSegments(bbox, zoom, 'aadt_line', ac.signal)
-                        .then(setAadtLines)
+                if (showSpeedLimits && zoom >= 11) {
+                    fetchSpeedLimitZones(bbox, zoom, ac.signal)
+                        .then(setZones)
                         .catch(() => {});
                 } else {
-                    setAadtLines(null);
-                }
-                if (showSpeedLimits) {
-                    fetchSegments(bbox, zoom, 'speed_limit', ac.signal)
-                        .then(setSpeedLimits)
-                        .catch(() => {});
-                } else {
-                    setSpeedLimits(null);
+                    setZones(null);
                 }
             }, 250);
         };
         const idle = map.addListener('idle', refresh);
         refresh();
         return () => idle.remove();
-    }, [map, showSpeedLimits, showAadtLines]);
+    }, [map, showSpeedLimits]);
 
     useSiteMarkers(map, sites, onSelect);
-    usePolylines(map, aadtLines, (level) => colourFor(level), 4);
-    usePolylines(map, speedLimits, () => '#7e57c2', 2);
+    useZonePolygons(map, zones);
 
     return null;
 }
@@ -151,36 +135,61 @@ function useSiteMarkers(
     }, [map, fc, onSelect]);
 }
 
-function usePolylines(
+/**
+ * Colour a speed-limit zone by its posted speed (visualises the speed-management
+ * gradient from urban 30s through to motorway 110s).
+ */
+function speedColour(kmh: number | null): string {
+    if (kmh === null) return '#9e9e9e';
+    if (kmh <= 30) return '#7e57c2';
+    if (kmh <= 50) return '#5c6bc0';
+    if (kmh <= 70) return '#26a69a';
+    if (kmh <= 80) return '#66bb6a';
+    if (kmh <= 100) return '#ffa726';
+    return '#ef5350';
+}
+
+function useZonePolygons(
     map: google.maps.Map | null,
-    fc: FeatureCollection<SegmentFeature> | null,
-    colourPicker: (level: NzgttmLevel | null) => string,
-    weight: number,
+    fc: FeatureCollection<SpeedLimitZoneFeature> | null,
 ) {
-    const linesRef = useRef<google.maps.Polyline[]>([]);
+    const polygonsRef = useRef<google.maps.Polygon[]>([]);
 
     useEffect(() => {
         if (!map) return;
-        linesRef.current.forEach((l) => l.setMap(null));
-        linesRef.current = [];
+        polygonsRef.current.forEach((p) => p.setMap(null));
+        polygonsRef.current = [];
 
         if (!fc) return;
 
         for (const feat of fc.features) {
-            const path = feat.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
-            const line = new google.maps.Polyline({
-                path,
-                strokeColor: colourPicker(feat.properties.nzgttm_level),
-                strokeOpacity: 0.8,
-                strokeWeight: weight,
-                map,
-            });
-            linesRef.current.push(line);
+            const colour = speedColour(feat.properties.speed_limit_kmh);
+            const ringSets =
+                feat.geometry.type === 'Polygon'
+                    ? [feat.geometry.coordinates]
+                    : feat.geometry.coordinates;
+
+            for (const polygonRings of ringSets) {
+                const paths = polygonRings.map((ring) =>
+                    ring.map(([lng, lat]) => ({ lat, lng })),
+                );
+                const polygon = new google.maps.Polygon({
+                    paths,
+                    strokeColor: colour,
+                    strokeOpacity: 0.7,
+                    strokeWeight: 1,
+                    fillColor: colour,
+                    fillOpacity: 0.15,
+                    clickable: false,
+                    map,
+                });
+                polygonsRef.current.push(polygon);
+            }
         }
 
         return () => {
-            linesRef.current.forEach((l) => l.setMap(null));
-            linesRef.current = [];
+            polygonsRef.current.forEach((p) => p.setMap(null));
+            polygonsRef.current = [];
         };
-    }, [map, fc, colourPicker, weight]);
+    }, [map, fc]);
 }

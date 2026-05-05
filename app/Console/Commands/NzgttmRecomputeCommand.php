@@ -9,7 +9,7 @@ class NzgttmRecomputeCommand extends Command
 {
     protected $signature = 'nzgttm:recompute';
 
-    protected $description = 'Snap count sites/AADT lines to nearest NSLR speed limit and recompute NZGTTM road levels.';
+    protected $description = 'Snap count sites to NSLR speed-limit zone (point-in-polygon) and recompute NZGTTM road levels.';
 
     public function handle(): int
     {

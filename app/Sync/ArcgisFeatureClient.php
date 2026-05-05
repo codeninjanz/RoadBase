@@ -7,8 +7,9 @@ use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 /**
- * Pages through an ArcGIS REST FeatureServer/MapServer layer query endpoint
- * and yields raw feature dicts.
+ * Pages an ArcGIS REST FeatureServer/MapServer layer query endpoint and yields
+ * GeoJSON features ({geometry, properties}). Defaults to f=geojson so polygon
+ * geometries can be handed straight to MySQL's ST_GeomFromGeoJSON.
  */
 class ArcgisFeatureClient
 {
@@ -21,20 +22,20 @@ class ArcgisFeatureClient
     ) {}
 
     /**
-     * @return Generator<int, array<string, mixed>>
+     * @return Generator<int, array{type:string, geometry:?array, properties:array}>
      */
     public function features(): Generator
     {
         $offset = 0;
 
         while (true) {
-            $response = Http::timeout(60)
+            $response = Http::timeout(120)
                 ->retry(3, 1500, throw: false)
                 ->get(rtrim($this->featureUrl, '/').'/query', [
                     'where' => $this->where,
                     'outFields' => $this->outFields,
                     'outSR' => $this->outSR,
-                    'f' => 'json',
+                    'f' => 'geojson',
                     'resultOffset' => $offset,
                     'resultRecordCount' => $this->pageSize,
                     'returnGeometry' => 'true',
@@ -64,7 +65,11 @@ class ArcgisFeatureClient
                 yield $feature;
             }
 
-            if (count($features) < $this->pageSize && empty($body['exceededTransferLimit'])) {
+            // GeoJSON envelope can carry exceededTransferLimit at top level.
+            $more = ! empty($body['exceededTransferLimit'])
+                || count($features) >= $this->pageSize;
+
+            if (! $more) {
                 return;
             }
 

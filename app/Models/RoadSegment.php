@@ -12,9 +12,7 @@ class RoadSegment extends Model
     protected $casts = [
         'raw_payload' => 'array',
         'synced_at' => 'datetime',
-        'aadt' => 'integer',
         'speed_limit_kmh' => 'integer',
-        'heavy_vehicle_pct' => 'float',
     ];
 
     public function dataSource(): BelongsTo

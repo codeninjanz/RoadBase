@@ -5,15 +5,22 @@ namespace App\Sync;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Equivalent of SiteUpsert for road_segments. Geometry is a LINESTRING in WKT.
+ * Single-statement upsert for road_segments rows whose geom is a Polygon
+ * or MultiPolygon (e.g. NSLR speed-limit zones). Lets us keep the geom
+ * column NOT NULL — required for the SPATIAL INDEX on MySQL 8.
  */
-class SegmentUpsert
+class ZoneUpsert
 {
-    public static function upsert(int $dataSourceId, string $externalId, string $kind, string $wkt, array $fields): void
-    {
+    public static function upsert(
+        int $dataSourceId,
+        string $externalId,
+        string $kind,
+        string $geomGeoJson,
+        array $fields,
+    ): void {
         $columns = ['data_source_id', 'external_id', 'kind', 'geom'];
-        $placeholders = ['?', '?', '?', 'ST_GeomFromText(?, 4326, \'axis-order=long-lat\')'];
-        $bindings = [$dataSourceId, $externalId, $kind, $wkt];
+        $placeholders = ['?', '?', '?', 'ST_GeomFromGeoJSON(?, 1, 4326)'];
+        $bindings = [$dataSourceId, $externalId, $kind, $geomGeoJson];
 
         $updates = [];
         foreach ($fields as $col => $value) {

@@ -17,15 +17,21 @@ export interface SiteFeature {
     };
 }
 
-export interface SegmentFeature {
+export type ZoneGeometry =
+    | { type: 'Polygon'; coordinates: [number, number][][] }
+    | { type: 'MultiPolygon'; coordinates: [number, number][][][] };
+
+export interface SpeedLimitZoneFeature {
     type: 'Feature';
     id: number;
-    geometry: { type: 'LineString'; coordinates: [number, number][] };
+    geometry: ZoneGeometry;
     properties: {
         id: number;
         road_name: string | null;
-        aadt: number | null;
+        zone_name: string | null;
+        rca: string | null;
         speed_limit_kmh: number | null;
+        speed_limit_type: string | null;
         nzgttm_level: NzgttmLevel | null;
     };
 }

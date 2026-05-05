@@ -1,36 +1,21 @@
 import { LEVEL_COLOURS, LEVEL_LABELS } from '@/lib/nzgttm';
 
 interface Props {
-    showAadtLines: boolean;
     showSpeedLimits: boolean;
-    onToggleAadtLines: (next: boolean) => void;
     onToggleSpeedLimits: (next: boolean) => void;
 }
 
-export function LayerToggles({
-    showAadtLines,
-    showSpeedLimits,
-    onToggleAadtLines,
-    onToggleSpeedLimits,
-}: Props) {
+export function LayerToggles({ showSpeedLimits, onToggleSpeedLimits }: Props) {
     return (
         <div className="absolute bottom-4 left-4 z-10 w-64 rounded-lg bg-white p-3 text-sm shadow-lg">
             <h3 className="mb-2 font-semibold">Layers</h3>
-            <label className="mb-1 flex items-center gap-2">
-                <input
-                    type="checkbox"
-                    checked={showAadtLines}
-                    onChange={(e) => onToggleAadtLines(e.target.checked)}
-                />
-                Estimated AADT (state highway lines)
-            </label>
             <label className="flex items-center gap-2">
                 <input
                     type="checkbox"
                     checked={showSpeedLimits}
                     onChange={(e) => onToggleSpeedLimits(e.target.checked)}
                 />
-                Speed limits (NSLR)
+                Speed limits (NSLR, zoom &ge; 11)
             </label>
 
             <div className="mt-3 border-t pt-2">

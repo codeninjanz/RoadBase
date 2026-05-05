@@ -14,8 +14,14 @@ class NslrSpeedLimitSync extends AbstractSyncJob
 
     protected function runSync(SyncRun $run, DataSource $source): void
     {
+        // Filter to currently-effective zones only (skip historical bylaws).
+        // ArcGIS supports CURRENT_TIMESTAMP in WHERE clauses on hosted services.
+        $where = "whenEffective <= CURRENT_TIMESTAMP "
+            ."AND (whenIneffective IS NULL OR whenIneffective > CURRENT_TIMESTAMP)";
+
         $client = new ArcgisFeatureClient(
             featureUrl: config('services.nslr.url'),
+            where: $where,
         );
 
         $upserted = 0;
@@ -23,46 +29,38 @@ class NslrSpeedLimitSync extends AbstractSyncJob
 
         foreach ($client->features() as $feature) {
             try {
-                $attrs = $feature['attributes'] ?? [];
-                $paths = $feature['geometry']['paths'] ?? [];
+                $props = $feature['properties'] ?? [];
+                $geom = $feature['geometry'] ?? null;
 
-                if (empty($paths)) {
+                if (! $geom || ! in_array($geom['type'] ?? '', ['Polygon', 'MultiPolygon'], true)) {
                     $failed++;
                     continue;
                 }
 
-                $longest = Geometry::longestPath($paths);
-                $wkt = Geometry::lineStringWkt($longest);
-                if ($wkt === null) {
-                    $failed++;
-                    continue;
-                }
+                $externalId = (string) ($props['GlobalID']
+                    ?? $props['speedLimitZoneId']
+                    ?? $props['OBJECTID']
+                    ?? '');
 
-                $externalId = (string) ($attrs['globalId'] ?? $attrs['GlobalID'] ?? $attrs['OBJECTID'] ?? '');
-                $speed = self::intOrNull(
-                    $attrs['speedLimit']
-                    ?? $attrs['SpeedLimit']
-                    ?? $attrs['SpeedLimit_VKT']
-                    ?? $attrs['SPEED_LIMIT']
-                    ?? null
-                );
+                $speed = self::intOrNull($props['speedLimitZoneValue'] ?? null);
 
                 if ($externalId === '' || $speed === null) {
                     $failed++;
                     continue;
                 }
 
-                SegmentUpsert::upsert(
+                ZoneUpsert::upsert(
                     $source->id,
                     $externalId,
                     'speed_limit',
-                    $wkt,
+                    json_encode($geom),
                     [
-                        'road_name' => $attrs['roadName'] ?? $attrs['RoadName'] ?? null,
-                        'rca' => $attrs['rcaName'] ?? $attrs['RCA'] ?? null,
+                        'road_name' => null, // NSLR zones don't carry road names directly
+                        'rca' => $props['rcaZoneReferenceName'] ?? null,
+                        'zone_name' => $props['speedLimitZoneName'] ?? null,
                         'speed_limit_kmh' => $speed,
-                        'speed_limit_type' => $attrs['speedLimitType'] ?? $attrs['SpeedLimitType'] ?? null,
-                        'raw_payload' => $attrs,
+                        'speed_limit_type' => $props['speedCategoryName'] ?? null,
+                        'raw_payload' => $props,
                         'synced_at' => now(),
                     ]
                 );
