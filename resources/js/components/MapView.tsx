@@ -117,18 +117,20 @@ function useSiteMarkers(
         }
 
         console.debug(
-            `[RoadBase] useSiteMarkers: creating ${fc.features.length} markers`,
+            `[RoadBase] useSiteMarkers: creating ${fc.features.length} markers, first coords:`,
+            fc.features[0]?.geometry.coordinates,
+            'first props:',
+            fc.features[0]?.properties,
         );
 
         for (const feat of fc.features) {
             const [lng, lat] = feat.geometry.coordinates;
-            const colour = colourFor(feat.properties.nzgttm_level);
 
+            // Default red pin (no icon prop) to rule out icon rendering issues.
             const marker = new google.maps.Marker({
                 map,
                 position: { lat, lng },
                 title: feat.properties.road_name ?? `Site ${feat.properties.id}`,
-                icon: circleIcon(colour),
             });
             marker.addListener('click', () => onSelect(feat.properties.id));
             markersRef.current.push(marker);
