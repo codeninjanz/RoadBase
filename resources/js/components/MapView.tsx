@@ -28,7 +28,6 @@ export function MapView({ apiKey, onSelect, showSpeedLimits }: Props) {
     return (
         <APIProvider apiKey={apiKey}>
             <Map
-                mapId="roadbase"
                 defaultCenter={NZ_CENTRE}
                 defaultZoom={6}
                 gestureHandling="greedy"
@@ -95,41 +94,38 @@ function useSiteMarkers(
     fc: FeatureCollection<SiteFeature> | null,
     onSelect: (id: number) => void,
 ) {
-    const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+    const markersRef = useRef<google.maps.Marker[]>([]);
 
     useEffect(() => {
         if (!map) return;
-        markersRef.current.forEach((m) => (m.map = null));
+        markersRef.current.forEach((m) => m.setMap(null));
         markersRef.current = [];
 
         if (!fc) return;
 
-        const lib = google.maps.marker;
-        if (!lib?.AdvancedMarkerElement) return;
-
         for (const feat of fc.features) {
             const [lng, lat] = feat.geometry.coordinates;
             const colour = colourFor(feat.properties.nzgttm_level);
-            const dot = document.createElement('div');
-            dot.style.width = '14px';
-            dot.style.height = '14px';
-            dot.style.borderRadius = '50%';
-            dot.style.background = colour;
-            dot.style.border = '2px solid white';
-            dot.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.3)';
-            dot.style.cursor = 'pointer';
 
-            const marker = new lib.AdvancedMarkerElement({
+            const marker = new google.maps.Marker({
                 map,
                 position: { lat, lng },
-                content: dot,
+                title: feat.properties.road_name ?? `Site ${feat.properties.id}`,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 7,
+                    fillColor: colour,
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2,
+                },
             });
-            marker.addListener('gmp-click', () => onSelect(feat.properties.id));
+            marker.addListener('click', () => onSelect(feat.properties.id));
             markersRef.current.push(marker);
         }
 
         return () => {
-            markersRef.current.forEach((m) => (m.map = null));
+            markersRef.current.forEach((m) => m.setMap(null));
             markersRef.current = [];
         };
     }, [map, fc, onSelect]);
