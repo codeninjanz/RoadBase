@@ -122,7 +122,7 @@ class SiteController extends Controller
         SQL, [$lng, $lat, $lng, $lat]);
 
         if (! empty($nslr?->rca)) {
-            return $nslr->rca;
+            return self::displayRcaName($nslr->rca);
         }
 
         $ta = DB::selectOne(<<<'SQL'
@@ -135,5 +135,18 @@ class SiteController extends Controller
         SQL, [$lng, $lat, $lng, $lat]);
 
         return $ta->name ?? null;
+    }
+
+    /**
+     * NSLR labels state-highway zones with "State Highways". TMP authors and
+     * the NZGTTM guide both use "Waka Kotahi NZ Transport Agency" — surface
+     * that name so the export and panel match the rest of the industry.
+     */
+    private static function displayRcaName(string $raw): string
+    {
+        return match (strtolower(trim($raw))) {
+            'state highways', 'state highway', 'sh' => 'Waka Kotahi NZ Transport Agency',
+            default => $raw,
+        };
     }
 }

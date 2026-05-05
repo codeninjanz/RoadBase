@@ -107,7 +107,7 @@ class TmpExportController extends Controller
         SQL, [$lng, $lat, $lng, $lat]);
 
         if (! empty($nslr?->rca)) {
-            return $nslr->rca;
+            return self::displayRcaName($nslr->rca);
         }
 
         $ta = DB::selectOne(<<<'SQL'
@@ -120,6 +120,14 @@ class TmpExportController extends Controller
         SQL, [$lng, $lat, $lng, $lat]);
 
         return $ta->name ?? null;
+    }
+
+    private static function displayRcaName(string $raw): string
+    {
+        return match (strtolower(trim($raw))) {
+            'state highways', 'state highway', 'sh' => 'Waka Kotahi NZ Transport Agency',
+            default => $raw,
+        };
     }
 
     /**
