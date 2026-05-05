@@ -18,7 +18,7 @@ class SearchController extends Controller
         }
 
         $sites = DB::select(<<<'SQL'
-            SELECT id, road_name, ST_X(location) AS lng, ST_Y(location) AS lat
+            SELECT id, road_name, ST_Longitude(location) AS lng, ST_Latitude(location) AS lat
             FROM count_sites
             WHERE road_name LIKE ?
             ORDER BY road_name ASC

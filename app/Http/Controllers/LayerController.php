@@ -25,8 +25,8 @@ class LayerController extends Controller
                 cs.count_date,
                 ds.key  AS source_key,
                 ds.name AS source_name,
-                ST_X(cs.location) AS lng,
-                ST_Y(cs.location) AS lat
+                ST_Longitude(cs.location) AS lng,
+                ST_Latitude(cs.location) AS lat
             FROM count_sites cs
             JOIN data_sources ds ON ds.id = cs.data_source_id
             WHERE MBRContains(
@@ -115,7 +115,7 @@ class LayerController extends Controller
 
         $rows = DB::select(<<<'SQL'
             SELECT id, road_name, severity, crash_year, speed_limit_kmh,
-                   ST_X(location) AS lng, ST_Y(location) AS lat
+                   ST_Longitude(location) AS lng, ST_Latitude(location) AS lat
             FROM crashes
             WHERE MBRContains(
                 ST_SRID(ST_GeomFromText(?), 4326),

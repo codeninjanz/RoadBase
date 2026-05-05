@@ -48,7 +48,7 @@ class TmpExportController extends Controller
                 cs.id, cs.road_name, cs.region, cs.aadt, cs.heavy_vehicle_pct,
                 cs.peak_hour_volume, cs.peak_hour_start, cs.count_date,
                 cs.speed_limit_kmh, cs.nzgttm_level, cs.synced_at,
-                ST_X(cs.location) AS lng, ST_Y(cs.location) AS lat,
+                ST_Longitude(cs.location) AS lng, ST_Latitude(cs.location) AS lat,
                 ds.name AS source_name, ds.url AS source_url
             FROM count_sites cs
             JOIN data_sources ds ON ds.id = cs.data_source_id
