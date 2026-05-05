@@ -65,17 +65,10 @@ function BboxLayers({
                 const ne = bounds.getNorthEast();
                 const bbox: Bbox = [sw.lng(), sw.lat(), ne.lng(), ne.lat()];
 
-                console.debug('[RoadBase] fetching sites', { bbox, zoom });
-
                 const ac = new AbortController();
                 fetchSites(bbox, zoom, ac.signal)
-                    .then((fc) => {
-                        console.debug('[RoadBase] sites fetched:', fc.features.length);
-                        setSites(fc);
-                    })
-                    .catch((e) => {
-                        console.error('[RoadBase] sites fetch failed:', e);
-                    });
+                    .then(setSites)
+                    .catch(() => {});
                 if (showSpeedLimits && zoom >= 11) {
                     fetchSpeedLimitZones(bbox, zoom, ac.signal)
                         .then(setZones)
@@ -104,41 +97,25 @@ function useSiteMarkers(
     const markersRef = useRef<google.maps.Marker[]>([]);
 
     useEffect(() => {
-        if (!map) {
-            console.debug('[RoadBase] useSiteMarkers: map not ready yet');
-            return;
-        }
+        if (!map) return;
         markersRef.current.forEach((m) => m.setMap(null));
         markersRef.current = [];
 
-        if (!fc) {
-            console.debug('[RoadBase] useSiteMarkers: no feature collection yet');
-            return;
-        }
-
-        console.debug(
-            `[RoadBase] useSiteMarkers: creating ${fc.features.length} markers, first coords:`,
-            fc.features[0]?.geometry.coordinates,
-            'first props:',
-            fc.features[0]?.properties,
-        );
+        if (!fc) return;
 
         for (const feat of fc.features) {
             const [lng, lat] = feat.geometry.coordinates;
+            const colour = colourFor(feat.properties.nzgttm_level);
 
-            // Default red pin (no icon prop) to rule out icon rendering issues.
             const marker = new google.maps.Marker({
                 map,
                 position: { lat, lng },
                 title: feat.properties.road_name ?? `Site ${feat.properties.id}`,
+                icon: circleIcon(colour),
             });
             marker.addListener('click', () => onSelect(feat.properties.id));
             markersRef.current.push(marker);
         }
-
-        console.debug(
-            `[RoadBase] useSiteMarkers: ${markersRef.current.length} markers attached to map`,
-        );
 
         return () => {
             markersRef.current.forEach((m) => m.setMap(null));
