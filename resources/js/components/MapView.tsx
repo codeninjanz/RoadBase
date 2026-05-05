@@ -90,7 +90,11 @@ function BboxLayers({
                 } else {
                     setZones(null);
                 }
-                if (showRcas) {
+                // RCA polygons are large multi-polygons; only fetch above
+                // zoom 7 so we don't ship 25MB of GeoJSON for the whole NZ
+                // viewport at low zooms. The polygons are visible at the
+                // scales TMP authors actually plan against.
+                if (showRcas && zoom >= 7) {
                     fetchRcas(bbox, zoom, ac.signal)
                         .then(setRcas)
                         .catch(() => {});
