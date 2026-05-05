@@ -65,10 +65,17 @@ function BboxLayers({
                 const ne = bounds.getNorthEast();
                 const bbox: Bbox = [sw.lng(), sw.lat(), ne.lng(), ne.lat()];
 
+                console.debug('[RoadBase] fetching sites', { bbox, zoom });
+
                 const ac = new AbortController();
                 fetchSites(bbox, zoom, ac.signal)
-                    .then(setSites)
-                    .catch(() => {});
+                    .then((fc) => {
+                        console.debug('[RoadBase] sites fetched:', fc.features.length);
+                        setSites(fc);
+                    })
+                    .catch((e) => {
+                        console.error('[RoadBase] sites fetch failed:', e);
+                    });
                 if (showSpeedLimits && zoom >= 11) {
                     fetchSpeedLimitZones(bbox, zoom, ac.signal)
                         .then(setZones)
@@ -97,11 +104,21 @@ function useSiteMarkers(
     const markersRef = useRef<google.maps.Marker[]>([]);
 
     useEffect(() => {
-        if (!map) return;
+        if (!map) {
+            console.debug('[RoadBase] useSiteMarkers: map not ready yet');
+            return;
+        }
         markersRef.current.forEach((m) => m.setMap(null));
         markersRef.current = [];
 
-        if (!fc) return;
+        if (!fc) {
+            console.debug('[RoadBase] useSiteMarkers: no feature collection yet');
+            return;
+        }
+
+        console.debug(
+            `[RoadBase] useSiteMarkers: creating ${fc.features.length} markers`,
+        );
 
         for (const feat of fc.features) {
             const [lng, lat] = feat.geometry.coordinates;
@@ -123,6 +140,10 @@ function useSiteMarkers(
             marker.addListener('click', () => onSelect(feat.properties.id));
             markersRef.current.push(marker);
         }
+
+        console.debug(
+            `[RoadBase] useSiteMarkers: ${markersRef.current.length} markers attached to map`,
+        );
 
         return () => {
             markersRef.current.forEach((m) => m.setMap(null));
