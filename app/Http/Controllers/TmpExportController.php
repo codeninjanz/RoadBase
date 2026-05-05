@@ -95,7 +95,7 @@ class TmpExportController extends Controller
 
     private function nearestRca(float $lat, float $lng): ?string
     {
-        $row = DB::selectOne(<<<'SQL'
+        $nslr = DB::selectOne(<<<'SQL'
             SELECT rca
             FROM road_segments
             WHERE kind = 'speed_limit'
@@ -106,7 +106,20 @@ class TmpExportController extends Controller
             LIMIT 1
         SQL, [$lng, $lat, $lng, $lat]);
 
-        return $row->rca ?? null;
+        if (! empty($nslr?->rca)) {
+            return $nslr->rca;
+        }
+
+        $ta = DB::selectOne(<<<'SQL'
+            SELECT name
+            FROM rcas
+            WHERE kind = 'territorial_authority'
+              AND MBRContains(geom, ST_SRID(POINT(?, ?), 4326))
+              AND ST_Contains(geom, ST_SRID(POINT(?, ?), 4326))
+            LIMIT 1
+        SQL, [$lng, $lat, $lng, $lat]);
+
+        return $ta->name ?? null;
     }
 
     /**

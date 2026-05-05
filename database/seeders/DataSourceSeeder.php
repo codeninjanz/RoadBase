@@ -35,6 +35,12 @@ class DataSourceSeeder extends Seeder
                 'update_frequency_hours' => 24 * 30,
             ],
             [
+                'key' => 'stats_nz_ta',
+                'name' => 'Stats NZ Territorial Authority 2023',
+                'url' => 'https://datafinder.stats.govt.nz/layer/106666-territorial-authority-2023-clipped-generalised/',
+                'update_frequency_hours' => 24 * 365,
+            ],
+            [
                 'key' => 'at_adt',
                 'name' => 'Auckland Transport Average Daily Traffic',
                 'url' => 'https://data-atgis.opendata.arcgis.com/datasets/ATgis::average-daily-traffic-counts',

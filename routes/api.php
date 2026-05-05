@@ -11,6 +11,7 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/layers/sites', [LayerController::class, 'sites']);
     Route::get('/layers/segments', [LayerController::class, 'segments']);
     Route::get('/layers/crashes', [LayerController::class, 'crashes']);
+    Route::get('/layers/rcas', [LayerController::class, 'rcas']);
 
     Route::get('/sites/{site}', [SiteController::class, 'show']);
     // New: NZGTTM Activity & Environment Context export.

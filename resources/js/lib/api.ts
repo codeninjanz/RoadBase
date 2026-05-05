@@ -1,4 +1,10 @@
-import type { FeatureCollection, SiteDetail, SiteFeature, SpeedLimitZoneFeature } from '@/types';
+import type {
+    FeatureCollection,
+    RcaFeature,
+    SiteDetail,
+    SiteFeature,
+    SpeedLimitZoneFeature,
+} from '@/types';
 
 export type Bbox = [number, number, number, number];
 
@@ -29,6 +35,13 @@ export function fetchSpeedLimitZones(b: Bbox, z: number, signal?: AbortSignal) {
 export function fetchCrashes(b: Bbox, z: number, signal?: AbortSignal) {
     return getJson<FeatureCollection<SiteFeature>>(
         `/api/layers/crashes?bbox=${bboxParam(b)}&z=${z}`,
+        signal,
+    );
+}
+
+export function fetchRcas(b: Bbox, z: number, signal?: AbortSignal) {
+    return getJson<FeatureCollection<RcaFeature>>(
+        `/api/layers/rcas?bbox=${bboxParam(b)}&z=${z}`,
         signal,
     );
 }

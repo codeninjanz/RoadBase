@@ -1,19 +1,25 @@
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
 import { useEffect, useRef, useState } from 'react';
 import type { Bbox } from '@/lib/api';
-import { fetchSites, fetchSpeedLimitZones } from '@/lib/api';
+import { fetchRcas, fetchSites, fetchSpeedLimitZones } from '@/lib/api';
 import { speedColour } from '@/lib/nzgttm';
-import type { FeatureCollection, SiteFeature, SpeedLimitZoneFeature } from '@/types';
+import type {
+    FeatureCollection,
+    RcaFeature,
+    SiteFeature,
+    SpeedLimitZoneFeature,
+} from '@/types';
 
 interface Props {
     apiKey: string | null;
     onSelect: (siteId: number) => void;
     showSpeedLimits: boolean;
+    showRcas: boolean;
 }
 
 const NZ_CENTRE = { lat: -41.0, lng: 174.0 };
 
-export function MapView({ apiKey, onSelect, showSpeedLimits }: Props) {
+export function MapView({ apiKey, onSelect, showSpeedLimits, showRcas }: Props) {
     if (!apiKey) {
         return (
             <div className="flex h-full items-center justify-center bg-gray-50 text-center text-sm text-gray-600">
@@ -34,7 +40,11 @@ export function MapView({ apiKey, onSelect, showSpeedLimits }: Props) {
                 disableDefaultUI={false}
                 style={{ width: '100%', height: '100%' }}
             >
-                <BboxLayers onSelect={onSelect} showSpeedLimits={showSpeedLimits} />
+                <BboxLayers
+                    onSelect={onSelect}
+                    showSpeedLimits={showSpeedLimits}
+                    showRcas={showRcas}
+                />
                 <MyLocationControl />
             </Map>
         </APIProvider>
@@ -44,13 +54,16 @@ export function MapView({ apiKey, onSelect, showSpeedLimits }: Props) {
 function BboxLayers({
     onSelect,
     showSpeedLimits,
+    showRcas,
 }: {
     onSelect: (id: number) => void;
     showSpeedLimits: boolean;
+    showRcas: boolean;
 }) {
     const map = useMap();
     const [sites, setSites] = useState<FeatureCollection<SiteFeature> | null>(null);
     const [zones, setZones] = useState<FeatureCollection<SpeedLimitZoneFeature> | null>(null);
+    const [rcas, setRcas] = useState<FeatureCollection<RcaFeature> | null>(null);
 
     const debounceRef = useRef<number | null>(null);
 
@@ -77,15 +90,23 @@ function BboxLayers({
                 } else {
                     setZones(null);
                 }
+                if (showRcas) {
+                    fetchRcas(bbox, zoom, ac.signal)
+                        .then(setRcas)
+                        .catch(() => {});
+                } else {
+                    setRcas(null);
+                }
             }, 250);
         };
         const idle = map.addListener('idle', refresh);
         refresh();
         return () => idle.remove();
-    }, [map, showSpeedLimits]);
+    }, [map, showSpeedLimits, showRcas]);
 
     useSiteMarkers(map, sites, onSelect);
     useZonePolygons(map, zones);
+    useRcaPolygons(map, rcas);
 
     return null;
 }
@@ -214,6 +235,52 @@ function useZonePolygons(
                     strokeWeight: 1,
                     fillColor: colour,
                     fillOpacity: 0.15,
+                    clickable: false,
+                    map,
+                });
+                polygonsRef.current.push(polygon);
+            }
+        }
+
+        return () => {
+            polygonsRef.current.forEach((p) => p.setMap(null));
+            polygonsRef.current = [];
+        };
+    }, [map, fc]);
+}
+
+const RCA_STROKE = '#0f766e';
+
+function useRcaPolygons(
+    map: google.maps.Map | null,
+    fc: FeatureCollection<RcaFeature> | null,
+) {
+    const polygonsRef = useRef<google.maps.Polygon[]>([]);
+
+    useEffect(() => {
+        if (!map) return;
+        polygonsRef.current.forEach((p) => p.setMap(null));
+        polygonsRef.current = [];
+
+        if (!fc) return;
+
+        for (const feat of fc.features) {
+            const ringSets =
+                feat.geometry.type === 'Polygon'
+                    ? [feat.geometry.coordinates]
+                    : feat.geometry.coordinates;
+
+            for (const polygonRings of ringSets) {
+                const paths = polygonRings.map((ring) =>
+                    ring.map(([lng, lat]) => ({ lat, lng })),
+                );
+                const polygon = new google.maps.Polygon({
+                    paths,
+                    strokeColor: RCA_STROKE,
+                    strokeOpacity: 0.85,
+                    strokeWeight: 1.5,
+                    fillColor: RCA_STROKE,
+                    fillOpacity: 0.05,
                     clickable: false,
                     map,
                 });

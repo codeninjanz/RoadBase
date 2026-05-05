@@ -9,6 +9,7 @@ export default function MapPage() {
     const { props } = usePage<InertiaSharedProps>();
     const [selected, setSelected] = useState<number | null>(null);
     const [showSpeedLimits, setShowSpeedLimits] = useState(false);
+    const [showRcas, setShowRcas] = useState(false);
 
     return (
         <>
@@ -40,10 +41,13 @@ export default function MapPage() {
                         apiKey={props.maps.browserKey}
                         onSelect={setSelected}
                         showSpeedLimits={showSpeedLimits}
+                        showRcas={showRcas}
                     />
                     <LayerToggles
                         showSpeedLimits={showSpeedLimits}
                         onToggleSpeedLimits={setShowSpeedLimits}
+                        showRcas={showRcas}
+                        onToggleRcas={setShowRcas}
                     />
                     {selected !== null && (
                         <SiteDetailPanel siteId={selected} onClose={() => setSelected(null)} />

@@ -35,6 +35,18 @@ export interface SpeedLimitZoneFeature {
     };
 }
 
+export interface RcaFeature {
+    type: 'Feature';
+    id: number;
+    geometry: ZoneGeometry;
+    properties: {
+        id: number;
+        code: string | null;
+        name: string;
+        kind: 'territorial_authority' | 'state_highway_network';
+    };
+}
+
 export interface FeatureCollection<F> {
     type: 'FeatureCollection';
     features: F[];

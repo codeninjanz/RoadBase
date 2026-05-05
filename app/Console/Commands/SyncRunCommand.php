@@ -6,6 +6,7 @@ use App\Jobs\RecomputeNzgttmLevels;
 use App\Sync\AbstractSyncJob;
 use App\Sync\NslrSpeedLimitSync;
 use App\Sync\NztaStateHighwayAadtSync;
+use App\Sync\RcaTaSync;
 use Illuminate\Console\Command;
 
 class SyncRunCommand extends Command
@@ -18,6 +19,7 @@ class SyncRunCommand extends Command
     private array $jobs = [
         'nzta_aadt' => NztaStateHighwayAadtSync::class,
         'nslr' => NslrSpeedLimitSync::class,
+        'stats_nz_ta' => RcaTaSync::class,
     ];
 
     public function handle(): int

@@ -109,6 +109,40 @@ class LayerController extends Controller
         ]);
     }
 
+    public function rcas(Request $request): JsonResponse
+    {
+        [$minLng, $minLat, $maxLng, $maxLat] = $this->parseBbox($request);
+        $zoom = (int) $request->integer('z', 8);
+        $tolerance = $this->simplifyToleranceFor($zoom);
+
+        $rows = DB::select(<<<'SQL'
+            SELECT
+                r.id, r.code, r.name, r.kind,
+                ST_AsGeoJSON(ST_Simplify(r.geom, ?)) AS geojson
+            FROM rcas r
+            WHERE MBRIntersects(
+                    ST_SRID(ST_GeomFromText(?), 4326),
+                    r.geom
+                  )
+            LIMIT ?
+        SQL, [$tolerance, $this->bboxWkt($minLng, $minLat, $maxLng, $maxLat), self::MAX_FEATURES]);
+
+        return response()->json([
+            'type' => 'FeatureCollection',
+            'features' => array_map(fn ($row) => [
+                'type' => 'Feature',
+                'id' => $row->id,
+                'geometry' => json_decode($row->geojson, true),
+                'properties' => [
+                    'id' => $row->id,
+                    'code' => $row->code,
+                    'name' => $row->name,
+                    'kind' => $row->kind,
+                ],
+            ], $rows),
+        ]);
+    }
+
     public function crashes(Request $request): JsonResponse
     {
         [$minLng, $minLat, $maxLng, $maxLat] = $this->parseBbox($request);
