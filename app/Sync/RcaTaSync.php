@@ -47,16 +47,18 @@ class RcaTaSync extends AbstractSyncJob
                     continue;
                 }
 
-                // Stats NZ TA layer field naming varies between vintages —
-                // try the common candidates in priority order.
-                $code = self::stringOrNull(
-                    $props['TA2023_V1_00'] ?? $props['TA2023_V_1_00'] ?? $props['TA2023_code']
-                    ?? $props['TA2023_V1'] ?? $props['TA_CODE'] ?? $props['code'] ?? null
-                );
-                $name = self::stringOrNull(
-                    $props['TA2023_V1_00_NAME'] ?? $props['TA2023_V_1_00_NAME']
-                    ?? $props['TA2023_NAME'] ?? $props['TA_NAME'] ?? $props['name'] ?? null
-                );
+                // Stats NZ TA layer field naming follows TA{year}_V1_00 /
+                // TA{year}_V1_00_NAME. Try the common vintages in priority
+                // order so the same sync works against 2023 / 2025 / 2026
+                // endpoints without code change.
+                $code = self::firstString($props, [
+                    'TA2026_V1_00', 'TA2025_V1_00', 'TA2023_V1_00',
+                    'TA_CODE', 'code',
+                ]);
+                $name = self::firstString($props, [
+                    'TA2026_V1_00_NAME', 'TA2025_V1_00_NAME', 'TA2023_V1_00_NAME',
+                    'TA_NAME', 'name',
+                ]);
                 $externalId = (string) ($code ?? $props['OBJECTID'] ?? '');
 
                 if ($externalId === '' || $name === null) {
@@ -125,5 +127,17 @@ class RcaTaSync extends AbstractSyncJob
     private static function stringOrNull(mixed $v): ?string
     {
         return is_string($v) && $v !== '' ? $v : null;
+    }
+
+    /** @param array<string, mixed> $props @param array<int, string> $keys */
+    private static function firstString(array $props, array $keys): ?string
+    {
+        foreach ($keys as $k) {
+            $v = self::stringOrNull($props[$k] ?? null);
+            if ($v !== null) {
+                return $v;
+            }
+        }
+        return null;
     }
 }

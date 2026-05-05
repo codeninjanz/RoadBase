@@ -36,9 +36,9 @@ class DataSourceSeeder extends Seeder
             ],
             [
                 'key' => 'stats_nz_ta',
-                'name' => 'Stats NZ Territorial Authority 2023',
-                'url' => 'https://datafinder.stats.govt.nz/layer/106666-territorial-authority-2023-clipped-generalised/',
-                'update_frequency_hours' => 24 * 365,
+                'name' => 'Stats NZ Territorial Authority (current vintage)',
+                'url' => 'https://services2.arcgis.com/vKb0s8tBIA3bdocZ/arcgis/rest/services/Territorial_Authority_2026/FeatureServer/0',
+                'update_frequency_hours' => 24 * 90,
             ],
             [
                 'key' => 'at_adt',
