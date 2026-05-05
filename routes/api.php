@@ -13,6 +13,10 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/layers/crashes', [LayerController::class, 'crashes']);
 
     Route::get('/sites/{site}', [SiteController::class, 'show']);
+    // New: NZGTTM Activity & Environment Context export.
+    Route::get('/sites/{site}/context.txt', [TmpExportController::class, 'text']);
+    Route::get('/sites/{site}/context.pdf', [TmpExportController::class, 'pdf']);
+    // Aliases — keep old links working (deprecated, point to same context export).
     Route::get('/sites/{site}/tmp.txt', [TmpExportController::class, 'text']);
     Route::get('/sites/{site}/tmp.pdf', [TmpExportController::class, 'pdf']);
 

@@ -23,8 +23,14 @@ export default function MapPage() {
                         </span>
                     </div>
                     <nav className="flex items-center gap-3 text-sm">
+                        <Link href="/tools/layout" className="text-gray-600 hover:text-gray-900">
+                            Layout
+                        </Link>
+                        <Link href="/tools/queue" className="text-gray-600 hover:text-gray-900">
+                            Queue
+                        </Link>
                         <Link href="/about" className="text-gray-600 hover:text-gray-900">
-                            About &amp; sources
+                            About
                         </Link>
                     </nav>
                 </header>

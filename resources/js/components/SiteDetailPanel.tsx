@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react';
+import { Link } from '@inertiajs/react';
 import { fetchSite } from '@/lib/api';
 import type { ContextBand, RoadContext, SiteDetail } from '@/types';
 import { ExportMenu } from './ExportMenu';
+
+const TABLE1_SPEEDS = [30, 40, 50, 60, 70, 80, 90, 100, 110];
+
+function snapToTable1Speed(kmh: number | null): number {
+    if (kmh === null) return 50;
+    return TABLE1_SPEEDS.reduce(
+        (best, s) => (Math.abs(s - kmh) < Math.abs(best - kmh) ? s : best),
+        TABLE1_SPEEDS[0],
+    );
+}
 
 interface Props {
     siteId: number;
@@ -32,7 +43,11 @@ export function SiteDetailPanel({ siteId, onClose }: Props) {
                     <div className="text-xs uppercase tracking-wide text-gray-500">Count site</div>
                     <h2 className="text-lg font-semibold">{site?.road_name ?? `Site ${siteId}`}</h2>
                 </div>
-                <button onClick={onClose} className="rounded p-1 text-gray-500 hover:bg-gray-100">
+                <button
+                    onClick={onClose}
+                    aria-label="Close site detail"
+                    className="-mr-2 inline-flex h-11 min-w-11 items-center justify-center rounded text-sm text-gray-500 hover:bg-gray-100"
+                >
                     Close
                 </button>
             </header>
@@ -43,6 +58,8 @@ export function SiteDetailPanel({ siteId, onClose }: Props) {
 
                 {site && (
                     <>
+                        <PrimaryStats site={site} />
+
                         <RoadContextCard context={site.context} />
 
                         <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -92,12 +109,60 @@ export function SiteDetailPanel({ siteId, onClose }: Props) {
                         </p>
 
                         <div className="mt-4 border-t pt-4">
+                            <ToolsRow
+                                speed={site.speed_limit_kmh}
+                                peakHourVolume={site.peak_hour_volume}
+                            />
+                        </div>
+
+                        <div className="mt-4 border-t pt-4">
                             <ExportMenu site={site} />
                         </div>
                     </>
                 )}
             </div>
         </aside>
+    );
+}
+
+function PrimaryStats({ site }: { site: SiteDetail }) {
+    return (
+        <section
+            aria-label="Primary site figures"
+            className="-mx-4 mb-4 grid grid-cols-3 gap-px bg-gray-200 px-0 sm:gap-3 sm:bg-transparent"
+        >
+            <BigStat
+                label="AADT"
+                value={site.aadt !== null ? site.aadt.toLocaleString() : '—'}
+                unit={site.aadt !== null ? 'vpd' : ''}
+            />
+            <BigStat
+                label="Speed"
+                value={site.speed_limit_kmh !== null ? String(site.speed_limit_kmh) : '—'}
+                unit={site.speed_limit_kmh !== null ? 'km/h' : ''}
+            />
+            <BigStat
+                label="Heavy"
+                value={site.heavy_vehicle_pct !== null ? `${site.heavy_vehicle_pct}` : '—'}
+                unit={site.heavy_vehicle_pct !== null ? '%' : ''}
+            />
+        </section>
+    );
+}
+
+function BigStat({ label, value, unit }: { label: string; value: string; unit: string }) {
+    return (
+        <div className="bg-white p-3 sm:rounded-md sm:border sm:shadow-sm">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                {label}
+            </div>
+            <div className="font-mono text-2xl font-bold tabular-nums leading-tight text-gray-900">
+                {value}
+                {unit && (
+                    <span className="ml-1 text-xs font-normal text-gray-500">{unit}</span>
+                )}
+            </div>
+        </div>
     );
 }
 
@@ -128,6 +193,36 @@ function BandRow({ icon, name, band }: { icon: string; name: string; band: Conte
                 <span className="text-gray-900">{band.label}</span>
             </div>
         </li>
+    );
+}
+
+function ToolsRow({
+    speed,
+    peakHourVolume,
+}: {
+    speed: number | null;
+    peakHourVolume: number | null;
+}) {
+    const target = snapToTable1Speed(speed);
+    const demand = peakHourVolume ?? 1000;
+    return (
+        <div>
+            <h3 className="text-sm font-semibold">NZGTTM tools</h3>
+            <div className="mt-2 flex flex-col gap-2">
+                <Link
+                    href={`/tools/layout?speed=${target}`}
+                    className="inline-flex min-h-[44px] items-center rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                    Layout calculator @ {target} km/h →
+                </Link>
+                <Link
+                    href={`/tools/queue?temp_speed_kmh=${target}&demand_vph=${demand}`}
+                    className="inline-flex min-h-[44px] items-center rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                    Queue calculator @ {demand.toLocaleString()} vph →
+                </Link>
+            </div>
+        </div>
     );
 }
 
