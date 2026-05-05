@@ -139,17 +139,44 @@ class LayerController extends Controller
         ]);
     }
 
-    /** @return array{0:float,1:float,2:float,3:float} */
+    /**
+     * Parse bbox=minLng,minLat,maxLng,maxLat and clamp to NZ bounds.
+     * Substitutes the full NZ bbox when the viewport is degenerate or
+     * crosses the antimeridian (e.g. zoomed all the way out).
+     *
+     * @return array{0:float,1:float,2:float,3:float}
+     */
     private function parseBbox(Request $request): array
     {
-        $bbox = $request->string('bbox')->toString();
-        $parts = array_map('floatval', array_pad(explode(',', $bbox), 4, '0'));
-        // Clamp to NZ-ish bounds to avoid pathological queries.
-        $parts[0] = max(160.0, min(180.0, $parts[0]));
-        $parts[2] = max(160.0, min(180.0, $parts[2]));
-        $parts[1] = max(-50.0, min(-30.0, $parts[1]));
-        $parts[3] = max(-50.0, min(-30.0, $parts[3]));
-        return $parts;
+        // NZ-ish bounds. Stewart Island ~ -47.3, Cape Reinga ~ -34.4,
+        // West coast ~ 166.4, Chathams ~ -176.5 (east of antimeridian).
+        $nzBbox = [165.0, -48.0, 179.0, -34.0];
+
+        $raw = $request->string('bbox')->toString();
+        if ($raw === '') {
+            return $nzBbox;
+        }
+
+        $parts = array_map('floatval', array_pad(explode(',', $raw), 4, '0'));
+        [$minLng, $minLat, $maxLng, $maxLat] = $parts;
+
+        // Antimeridian wrap (Google Maps reports SW.lng > NE.lng) — show all NZ.
+        if ($minLng > $maxLng) {
+            return $nzBbox;
+        }
+
+        // Clamp to NZ window.
+        $minLng = max($nzBbox[0], min($nzBbox[2], $minLng));
+        $maxLng = max($nzBbox[0], min($nzBbox[2], $maxLng));
+        $minLat = max($nzBbox[1], min($nzBbox[3], $minLat));
+        $maxLat = max($nzBbox[1], min($nzBbox[3], $maxLat));
+
+        // Reject zero-area boxes — fall back to NZ.
+        if ($maxLng - $minLng < 0.0001 || $maxLat - $minLat < 0.0001) {
+            return $nzBbox;
+        }
+
+        return [$minLng, $minLat, $maxLng, $maxLat];
     }
 
     private function bboxWkt(float $minLng, float $minLat, float $maxLng, float $maxLat): string
