@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchSite } from '@/lib/api';
-import type { SiteDetail } from '@/types';
-import { NzgttmBadge } from './NzgttmBadge';
+import type { ContextBand, RoadContext, SiteDetail } from '@/types';
 import { ExportMenu } from './ExportMenu';
 
 interface Props {
@@ -44,9 +43,11 @@ export function SiteDetailPanel({ siteId, onClose }: Props) {
 
                 {site && (
                     <>
-                        <Row label="NZGTTM road level">
-                            <NzgttmBadge level={site.nzgttm_level} showLabel />
-                        </Row>
+                        <RoadContextCard context={site.context} />
+
+                        <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            Detail
+                        </h3>
                         <Row label="AADT">
                             {site.aadt !== null ? `${site.aadt.toLocaleString()} vpd` : '—'}
                         </Row>
@@ -63,6 +64,8 @@ export function SiteDetailPanel({ siteId, onClose }: Props) {
                         </Row>
                         <Row label="Peak hour start">{site.peak_hour_start ?? '—'}</Row>
                         <Row label="Count date">{site.count_date ?? '—'}</Row>
+                        <Row label="Crashes (5 yr, 1 km)">{site.crash_count_5yr_1km}</Row>
+                        <Row label="Road controlling authority">{site.rca ?? '—'}</Row>
                         <Row label="Region">{site.region ?? '—'}</Row>
                         <Row label="Coordinates">
                             {site.lat.toFixed(6)}, {site.lng.toFixed(6)}
@@ -83,6 +86,11 @@ export function SiteDetailPanel({ siteId, onClose }: Props) {
                         </Row>
                         <Row label="Last synced">{site.synced_at ?? '—'}</Row>
 
+                        <p className="mt-4 rounded bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                            These figures are inputs to your own NZGTTM 2023 risk assessment, not a
+                            classification of the site. Road levels were retired in the 2023 guide.
+                        </p>
+
                         <div className="mt-4 border-t pt-4">
                             <ExportMenu site={site} />
                         </div>
@@ -90,6 +98,36 @@ export function SiteDetailPanel({ siteId, onClose }: Props) {
                 )}
             </div>
         </aside>
+    );
+}
+
+function RoadContextCard({ context }: { context: RoadContext }) {
+    return (
+        <section>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Road context
+            </h3>
+            <ul className="mt-2 space-y-1.5">
+                <BandRow icon="🚗" name="Volume" band={context.aadt} />
+                <BandRow icon="🚦" name="Speed" band={context.speed} />
+                <BandRow icon="🚛" name="Heavy" band={context.heavy} />
+                <BandRow icon="⚠️" name="Crashes" band={context.crash} />
+            </ul>
+        </section>
+    );
+}
+
+function BandRow({ icon, name, band }: { icon: string; name: string; band: ContextBand }) {
+    return (
+        <li className="flex items-start gap-2 text-sm">
+            <span aria-hidden className="w-5 text-base leading-5">
+                {icon}
+            </span>
+            <div className="min-w-0 flex-1">
+                <span className="text-gray-500">{name}: </span>
+                <span className="text-gray-900">{band.label}</span>
+            </div>
+        </li>
     );
 }
 

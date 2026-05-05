@@ -2,7 +2,7 @@ import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
 import { useEffect, useRef, useState } from 'react';
 import type { Bbox } from '@/lib/api';
 import { fetchSites, fetchSpeedLimitZones } from '@/lib/api';
-import { colourFor } from '@/lib/nzgttm';
+import { speedColour } from '@/lib/nzgttm';
 import type { FeatureCollection, SiteFeature, SpeedLimitZoneFeature } from '@/types';
 
 interface Props {
@@ -35,6 +35,7 @@ export function MapView({ apiKey, onSelect, showSpeedLimits }: Props) {
                 style={{ width: '100%', height: '100%' }}
             >
                 <BboxLayers onSelect={onSelect} showSpeedLimits={showSpeedLimits} />
+                <MyLocationControl />
             </Map>
         </APIProvider>
     );
@@ -105,7 +106,7 @@ function useSiteMarkers(
 
         for (const feat of fc.features) {
             const [lng, lat] = feat.geometry.coordinates;
-            const colour = colourFor(feat.properties.nzgttm_level);
+            const colour = speedColour(feat.properties.speed_limit_kmh);
 
             const marker = new google.maps.Marker({
                 map,
@@ -139,18 +140,47 @@ function circleIcon(fill: string): google.maps.Icon {
     };
 }
 
-/**
- * Colour a speed-limit zone by its posted speed (visualises the speed-management
- * gradient from urban 30s through to motorway 110s).
- */
-function speedColour(kmh: number | null): string {
-    if (kmh === null) return '#9e9e9e';
-    if (kmh <= 30) return '#7e57c2';
-    if (kmh <= 50) return '#5c6bc0';
-    if (kmh <= 70) return '#26a69a';
-    if (kmh <= 80) return '#66bb6a';
-    if (kmh <= 100) return '#ffa726';
-    return '#ef5350';
+function MyLocationControl() {
+    const map = useMap();
+    if (!map) return null;
+
+    const onClick = () => {
+        if (!('geolocation' in navigator)) return;
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                map.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                if ((map.getZoom() ?? 0) < 14) map.setZoom(14);
+            },
+            () => {},
+            { enableHighAccuracy: true, timeout: 8000 },
+        );
+    };
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-label="Centre map on my location"
+            title="Centre on my location"
+            className="absolute bottom-4 right-4 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/10 hover:bg-gray-50 active:bg-gray-100"
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+            >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+            </svg>
+        </button>
+    );
 }
 
 function useZonePolygons(

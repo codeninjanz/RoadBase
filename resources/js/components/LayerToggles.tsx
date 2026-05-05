@@ -1,4 +1,4 @@
-import { LEVEL_COLOURS, LEVEL_LABELS } from '@/lib/nzgttm';
+import { SPEED_BAND_COLOURS, UNKNOWN_SPEED_COLOUR } from '@/lib/nzgttm';
 
 interface Props {
     showSpeedLimits: boolean;
@@ -20,18 +20,25 @@ export function LayerToggles({ showSpeedLimits, onToggleSpeedLimits }: Props) {
 
             <div className="mt-3 border-t pt-2">
                 <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    NZGTTM levels
+                    Site marker — speed band
                 </h4>
                 <ul className="space-y-1 text-xs">
-                    {(Object.keys(LEVEL_COLOURS) as Array<keyof typeof LEVEL_COLOURS>).map((lv) => (
-                        <li key={lv} className="flex items-center gap-2">
+                    {SPEED_BAND_COLOURS.map((b) => (
+                        <li key={b.label} className="flex items-center gap-2">
                             <span
                                 className="inline-block h-3 w-3 rounded-full"
-                                style={{ background: LEVEL_COLOURS[lv] }}
+                                style={{ background: b.colour }}
                             />
-                            <span className="text-gray-700">{LEVEL_LABELS[lv]}</span>
+                            <span className="text-gray-700">{b.label}</span>
                         </li>
                     ))}
+                    <li className="flex items-center gap-2">
+                        <span
+                            className="inline-block h-3 w-3 rounded-full"
+                            style={{ background: UNKNOWN_SPEED_COLOUR }}
+                        />
+                        <span className="text-gray-700">Speed unknown</span>
+                    </li>
                 </ul>
             </div>
         </div>

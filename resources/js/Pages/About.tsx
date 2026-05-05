@@ -23,9 +23,11 @@ export default function AboutPage({ sources }: Props) {
                 </Link>
                 <h1 className="mt-4 text-2xl font-bold">About RoadBase</h1>
                 <p className="mt-3 text-gray-700">
-                    RoadBase aggregates publicly available NZ road traffic-volume data into a single
-                    interactive map for traffic-management planners producing TMPs under the NZGTTM
-                    framework. Data is auto-synced from each source on its natural cadence.
+                    RoadBase aggregates publicly available NZ road traffic-volume, speed-limit and
+                    crash data into a single interactive map. It is a public reference tool for TTM
+                    practitioners assembling the activity and environment context that the 2023
+                    NZGTTM risk-based workflow needs. Data is auto-synced from each source on its
+                    natural cadence.
                 </p>
 
                 <h2 className="mt-8 text-xl font-semibold">Data sources</h2>
@@ -62,17 +64,33 @@ export default function AboutPage({ sources }: Props) {
                     </tbody>
                 </table>
 
-                <h2 className="mt-8 text-xl font-semibold">NZGTTM road-level classification</h2>
+                <h2 className="mt-8 text-xl font-semibold">NZGTTM 2023 — road levels retired</h2>
                 <p className="mt-3 text-gray-700">
-                    RoadBase auto-computes the NZGTTM road level for each count site by spatially
-                    joining it to the National Speed Limit Register and applying the standard rules:
+                    Earlier versions of RoadBase auto-classified each count site into NZGTTM road
+                    levels (LV / 1 / 2 / 3) by AADT and posted speed. The April 2023{' '}
+                    <a
+                        href="https://www.nzta.govt.nz/assets/Road-Efficiency-Group-2/docs/temporary-traffic-management-tools/nzgttm.pdf"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 hover:underline"
+                    >
+                        New Zealand guide to temporary traffic management
+                    </a>{' '}
+                    explicitly retires this shortcut:
                 </p>
-                <ul className="mt-3 list-disc pl-6 text-gray-700">
-                    <li>LV: AADT &lt; 500 vpd</li>
-                    <li>1: AADT 500–10,000 vpd</li>
-                    <li>2: AADT &gt; 10,000 vpd</li>
-                    <li>3: AADT &gt; 10,000 vpd and speed limit &gt; 75 km/h</li>
-                </ul>
+                <blockquote className="mt-3 border-l-4 border-gray-300 pl-4 italic text-gray-700">
+                    “Road levels were a simplified risk assessment. By undertaking a risk assessment
+                    for each site, road levels are no longer necessary.”
+                    <span className="block text-xs not-italic text-gray-500">
+                        NZGTTM 2023, p.36 (Clarifications)
+                    </span>
+                </blockquote>
+                <p className="mt-3 text-gray-700">
+                    The site detail panel now surfaces road-context bands (volume, speed, heavy
+                    share, crash density) as inputs to your risk assessment, not as a level
+                    classification. The legacy <code>nzgttm_level</code> column remains in the
+                    database for backward compatibility but is not displayed.
+                </p>
             </div>
         </>
     );

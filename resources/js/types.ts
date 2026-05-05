@@ -40,6 +40,18 @@ export interface FeatureCollection<F> {
     features: F[];
 }
 
+export interface ContextBand {
+    band: string | null;
+    label: string;
+}
+
+export interface RoadContext {
+    aadt: ContextBand;
+    speed: ContextBand;
+    heavy: ContextBand;
+    crash: ContextBand;
+}
+
 export interface SiteDetail {
     id: number;
     road_name: string | null;
@@ -54,6 +66,9 @@ export interface SiteDetail {
     speed_limit_kmh: number | null;
     nzgttm_level: NzgttmLevel | null;
     synced_at: string | null;
+    rca: string | null;
+    crash_count_5yr_1km: number;
+    context: RoadContext;
     source: {
         key: string;
         name: string;

@@ -41,4 +41,39 @@ class NzgttmTest extends TestCase
         // High AADT with unknown speed defaults to Level 2 (conservative).
         $this->assertSame('2', Nzgttm::classify(20_000, null));
     }
+
+    public function test_context_bands_handle_nulls(): void
+    {
+        $b = Nzgttm::contextBands(null, null, null, null);
+        $this->assertNull($b['aadt']['band']);
+        $this->assertNull($b['speed']['band']);
+        $this->assertNull($b['heavy']['band']);
+        $this->assertNull($b['crash']['band']);
+        $this->assertSame('No AADT', $b['aadt']['label']);
+        $this->assertSame('Speed unknown', $b['speed']['label']);
+    }
+
+    public function test_context_bands_classify_typical_inputs(): void
+    {
+        $b = Nzgttm::contextBands(8_000, 70, 8.5, 5);
+        $this->assertSame('high', $b['aadt']['band']);
+        $this->assertSame('transition', $b['speed']['band']);
+        $this->assertSame('moderate', $b['heavy']['band']);
+        $this->assertSame('cluster', $b['crash']['band']);
+    }
+
+    public function test_context_bands_extremes(): void
+    {
+        $low = Nzgttm::contextBands(100, 30, 1.0, 0);
+        $this->assertSame('low', $low['aadt']['band']);
+        $this->assertSame('safe_system', $low['speed']['band']);
+        $this->assertSame('low', $low['heavy']['band']);
+        $this->assertSame('none', $low['crash']['band']);
+
+        $high = Nzgttm::contextBands(40_000, 110, 18.0, 25);
+        $this->assertSame('very_high', $high['aadt']['band']);
+        $this->assertSame('high_speed', $high['speed']['band']);
+        $this->assertSame('high', $high['heavy']['band']);
+        $this->assertSame('high', $high['crash']['band']);
+    }
 }
