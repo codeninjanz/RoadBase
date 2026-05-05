@@ -128,14 +128,7 @@ function useSiteMarkers(
                 map,
                 position: { lat, lng },
                 title: feat.properties.road_name ?? `Site ${feat.properties.id}`,
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 7,
-                    fillColor: colour,
-                    fillOpacity: 1,
-                    strokeColor: '#ffffff',
-                    strokeWeight: 2,
-                },
+                icon: circleIcon(colour),
             });
             marker.addListener('click', () => onSelect(feat.properties.id));
             markersRef.current.push(marker);
@@ -150,6 +143,21 @@ function useSiteMarkers(
             markersRef.current = [];
         };
     }, [map, fc, onSelect]);
+}
+
+/**
+ * SVG data-URL marker icon — coloured circle with a white halo. SymbolPath.CIRCLE
+ * was rendering as invisible against some basemaps; this is unambiguous.
+ */
+function circleIcon(fill: string): google.maps.Icon {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+        <circle cx="9" cy="9" r="6" fill="${fill}" stroke="white" stroke-width="2"/>
+    </svg>`;
+    return {
+        url: 'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
+        scaledSize: new google.maps.Size(18, 18),
+        anchor: new google.maps.Point(9, 9),
+    };
 }
 
 /**
