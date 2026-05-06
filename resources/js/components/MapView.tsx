@@ -283,16 +283,27 @@ function useRcaPolygons(
     fc: FeatureCollection<RcaFeature> | null,
 ) {
     const polygonsRef = useRef<google.maps.Polygon[]>([]);
-    const labelsRef = useRef<google.maps.Marker[]>([]);
+    const listenersRef = useRef<google.maps.MapsEventListener[]>([]);
+    const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
 
     useEffect(() => {
         if (!map) return;
+
         polygonsRef.current.forEach((p) => p.setMap(null));
         polygonsRef.current = [];
-        labelsRef.current.forEach((m) => m.setMap(null));
-        labelsRef.current = [];
+        listenersRef.current.forEach((l) => l.remove());
+        listenersRef.current = [];
+        infoWindowRef.current?.close();
 
         if (!fc) return;
+
+        if (!infoWindowRef.current) {
+            infoWindowRef.current = new google.maps.InfoWindow({
+                disableAutoPan: true,
+                pixelOffset: new google.maps.Size(0, -4),
+            });
+        }
+        const iw = infoWindowRef.current;
 
         for (const feat of fc.features) {
             const ringSets =
@@ -301,9 +312,7 @@ function useRcaPolygons(
                     : feat.geometry.coordinates;
 
             const fill = rcaFill(feat.id);
-            // Track largest ring (by vertex count) so the label can sit on
-            // the main landmass rather than an offshore island sliver.
-            let largestRing: { lat: number; lng: number }[] = [];
+            const name = feat.properties?.name ?? '';
 
             for (const polygonRings of ringSets) {
                 if (!Array.isArray(polygonRings) || polygonRings.length === 0) continue;
@@ -312,10 +321,6 @@ function useRcaPolygons(
                     .map((ring) => ring.map((p) => vertexToLatLng(p as [number, number])));
                 if (paths.length === 0) continue;
 
-                if (paths[0].length > largestRing.length) {
-                    largestRing = paths[0];
-                }
-
                 const polygon = new google.maps.Polygon({
                     paths,
                     strokeColor: RCA_STROKE,
@@ -323,50 +328,42 @@ function useRcaPolygons(
                     strokeWeight: 1.5,
                     fillColor: fill,
                     fillOpacity: 0.15,
-                    clickable: false,
+                    clickable: true,
                     map,
                 });
                 polygonsRef.current.push(polygon);
-            }
 
-            if (largestRing.length > 0 && feat.properties?.name) {
-                const c = ringCentroid(largestRing);
-                const labelMarker = new google.maps.Marker({
-                    position: c,
-                    map,
-                    clickable: false,
-                    icon: {
-                        // Invisible 1×1 anchor — the marker is just a label host.
-                        path: 'M 0,0 0,0',
-                        strokeOpacity: 0,
-                        scale: 0,
-                    },
-                    label: {
-                        text: feat.properties.name,
-                        color: '#0f172a',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                    },
-                });
-                labelsRef.current.push(labelMarker);
+                if (name) {
+                    listenersRef.current.push(
+                        polygon.addListener('mousemove', (e: google.maps.MapMouseEvent) => {
+                            if (!e.latLng) return;
+                            iw.setContent(
+                                `<div style="font:600 12px system-ui;color:#0f172a;padding:2px 4px;">${escapeHtml(name)}</div>`,
+                            );
+                            iw.setPosition(e.latLng);
+                            iw.open({ map });
+                        }),
+                        polygon.addListener('mouseout', () => iw.close()),
+                    );
+                }
             }
         }
 
         return () => {
             polygonsRef.current.forEach((p) => p.setMap(null));
             polygonsRef.current = [];
-            labelsRef.current.forEach((m) => m.setMap(null));
-            labelsRef.current = [];
+            listenersRef.current.forEach((l) => l.remove());
+            listenersRef.current = [];
+            infoWindowRef.current?.close();
         };
     }, [map, fc]);
 }
 
-function ringCentroid(ring: { lat: number; lng: number }[]): { lat: number; lng: number } {
-    let sumLat = 0;
-    let sumLng = 0;
-    for (const p of ring) {
-        sumLat += p.lat;
-        sumLng += p.lng;
-    }
-    return { lat: sumLat / ring.length, lng: sumLng / ring.length };
+function escapeHtml(s: string): string {
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
