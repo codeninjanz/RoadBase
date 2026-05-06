@@ -246,7 +246,7 @@ function useZonePolygons(
 
             for (const polygonRings of ringSets) {
                 const paths = polygonRings.map((ring) =>
-                    ring.map(([lng, lat]) => ({ lat, lng })),
+                    ring.map((p) => vertexToLatLng(p as [number, number])),
                 );
                 const polygon = new google.maps.Polygon({
                     paths,
@@ -280,6 +280,21 @@ const RCA_FILL_PALETTE = [
 
 function rcaFill(id: number): string {
     return RCA_FILL_PALETTE[Math.abs(id) % RCA_FILL_PALETTE.length];
+}
+
+/**
+ * MySQL ST_AsGeoJSON on a geographic SRS column emits coords in the SRS
+ * axis order (lat,lng for EPSG:4326) rather than the RFC 7946 lng,lat that
+ * google.maps.Polygon expects. We can't reliably force the order from the
+ * server side, so detect per-vertex: NZ latitudes are always in
+ * [-47, -34] and longitudes in [165, 180] (plus a small Chathams sliver
+ * past the antimeridian). |first| > 90 means the first slot is longitude
+ * and the input is RFC-correct; otherwise the first slot is latitude and
+ * we swap.
+ */
+function vertexToLatLng(pair: [number, number]): { lat: number; lng: number } {
+    const [a, b] = pair;
+    return Math.abs(a) > 90 ? { lng: a, lat: b } : { lat: a, lng: b };
 }
 
 function useRcaPolygons(
@@ -318,7 +333,7 @@ function useRcaPolygons(
                 }
                 const paths = polygonRings
                     .filter((ring) => Array.isArray(ring) && ring.length >= 3)
-                    .map((ring) => ring.map(([lng, lat]) => ({ lat, lng })));
+                    .map((ring) => ring.map((p) => vertexToLatLng(p as [number, number])));
                 if (paths.length === 0) {
                     console.log('[roadbase] skip degenerate paths for', feat.properties?.name);
                     continue;
