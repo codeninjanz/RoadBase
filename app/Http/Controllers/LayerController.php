@@ -73,6 +73,11 @@ class LayerController extends Controller
         $zoom = (int) $request->integer('z', 12);
         $tolerance = $this->simplifyToleranceFor($zoom);
 
+        // ST_Simplify on geographic MULTIPOLYGON fails in MySQL 8. Round-trip
+        // through SRID 0 to do the simplification in Cartesian space; same
+        // workaround used by the rcas endpoint. ST_AsGeoJSON on the resulting
+        // SRID-0 geometry emits coords in stored axis order — the client
+        // already swaps via vertexToLatLng().
         $rows = DB::select(<<<'SQL'
             SELECT
                 rs.id,
@@ -81,7 +86,9 @@ class LayerController extends Controller
                 rs.rca,
                 rs.speed_limit_kmh,
                 rs.speed_limit_type,
-                ST_AsGeoJSON(ST_Simplify(rs.geom, ?)) AS geojson
+                ST_AsGeoJSON(
+                    ST_Simplify(ST_GeomFromText(ST_AsText(rs.geom), 0), ?)
+                ) AS geojson
             FROM road_segments rs
             WHERE rs.kind = ?
               AND MBRIntersects(
