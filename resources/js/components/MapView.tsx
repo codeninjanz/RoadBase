@@ -254,6 +254,17 @@ function useZonePolygons(
 }
 
 const RCA_STROKE = '#0f766e';
+// Cycle through pastel tints so adjacent territorial authorities are visually
+// distinguishable. Hashing on the feature id keeps the colour stable across
+// re-renders.
+const RCA_FILL_PALETTE = [
+    '#0f766e', '#1d4ed8', '#7c3aed', '#db2777', '#ea580c',
+    '#65a30d', '#0891b2', '#be123c', '#a16207', '#0d9488',
+];
+
+function rcaFill(id: number): string {
+    return RCA_FILL_PALETTE[Math.abs(id) % RCA_FILL_PALETTE.length];
+}
 
 function useRcaPolygons(
     map: google.maps.Map | null,
@@ -274,17 +285,22 @@ function useRcaPolygons(
                     ? [feat.geometry.coordinates]
                     : feat.geometry.coordinates;
 
+            const fill = rcaFill(feat.id);
+
             for (const polygonRings of ringSets) {
-                const paths = polygonRings.map((ring) =>
-                    ring.map(([lng, lat]) => ({ lat, lng })),
-                );
+                if (!Array.isArray(polygonRings) || polygonRings.length === 0) continue;
+                const paths = polygonRings
+                    .filter((ring) => Array.isArray(ring) && ring.length >= 3)
+                    .map((ring) => ring.map(([lng, lat]) => ({ lat, lng })));
+                if (paths.length === 0) continue;
+
                 const polygon = new google.maps.Polygon({
                     paths,
                     strokeColor: RCA_STROKE,
-                    strokeOpacity: 0.85,
-                    strokeWeight: 1.5,
-                    fillColor: RCA_STROKE,
-                    fillOpacity: 0.05,
+                    strokeOpacity: 0.9,
+                    strokeWeight: 2,
+                    fillColor: fill,
+                    fillOpacity: 0.18,
                     clickable: false,
                     map,
                 });
