@@ -112,21 +112,26 @@ class LayerController extends Controller
     public function rcas(Request $request): JsonResponse
     {
         [$minLng, $minLat, $maxLng, $maxLat] = $this->parseBbox($request);
+        $zoom = (int) $request->integer('z', 8);
+        $tolerance = $this->simplifyToleranceFor($zoom);
 
-        // NB: no ST_Simplify here. MySQL 8 doesn't support ST_Simplify on
-        // MULTIPOLYGON in geographic SRS, and the source polygons are already
-        // generalised by Stats NZ (67 features for the whole country).
+        // MySQL 8 rejects ST_Simplify on geographic MULTIPOLYGON, so we
+        // round-trip the geometry through a SRID-0 (Cartesian) copy where
+        // ST_Simplify is supported. Treats degrees as a flat plane — fine
+        // at NZ latitudes for visual generalisation.
         $rows = DB::select(<<<'SQL'
             SELECT
                 r.id, r.code, r.name, r.kind,
-                ST_AsGeoJSON(r.geom) AS geojson
+                ST_AsGeoJSON(
+                    ST_Simplify(ST_GeomFromText(ST_AsText(r.geom), 0), ?)
+                ) AS geojson
             FROM rcas r
             WHERE MBRIntersects(
                     ST_SRID(ST_GeomFromText(?), 4326),
                     r.geom
                   )
             LIMIT ?
-        SQL, [$this->bboxWkt($minLng, $minLat, $maxLng, $maxLat), self::MAX_FEATURES]);
+        SQL, [$tolerance, $this->bboxWkt($minLng, $minLat, $maxLng, $maxLat), self::MAX_FEATURES]);
 
         return response()->json([
             'type' => 'FeatureCollection',
