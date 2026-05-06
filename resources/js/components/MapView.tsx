@@ -106,8 +106,8 @@ function BboxLayers({
                     }
                     setZones(null);
                 }
-                if (showRcas && zoom >= 7) {
-                    console.log('[roadbase] fetching rcas');
+                if (showRcas) {
+                    console.log('[roadbase] fetching rcas at zoom', zoom);
                     fetchRcas(bbox, zoom, ac.signal)
                         .then((fc) => {
                             console.log('[roadbase] rcas response', fc.features.length, 'first:', fc.features[0]);
@@ -115,9 +115,6 @@ function BboxLayers({
                         })
                         .catch((e) => console.warn('[roadbase] rcas fetch failed', e));
                 } else {
-                    if (showRcas) {
-                        console.log('[roadbase] zoom < 7 (got', zoom, ') — rcas suppressed');
-                    }
                     setRcas(null);
                 }
             }, 250);

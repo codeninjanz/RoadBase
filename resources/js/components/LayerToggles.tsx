@@ -30,7 +30,7 @@ export function LayerToggles({
                     checked={showRcas}
                     onChange={(e) => onToggleRcas(e.target.checked)}
                 />
-                RCA boundaries (zoom &ge; 7)
+                RCA boundaries
             </label>
 
             <div className="mt-3 border-t pt-2">
