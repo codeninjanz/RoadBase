@@ -219,6 +219,7 @@ function useZonePolygons(
         if (!fc) return;
 
         for (const feat of fc.features) {
+            if (!feat.geometry || !feat.geometry.type) continue;
             const colour = speedColour(feat.properties.speed_limit_kmh);
             const ringSets =
                 feat.geometry.type === 'Polygon'
@@ -306,6 +307,7 @@ function useRcaPolygons(
         const iw = infoWindowRef.current;
 
         for (const feat of fc.features) {
+            if (!feat.geometry || !feat.geometry.type) continue;
             const ringSets =
                 feat.geometry.type === 'Polygon'
                     ? [feat.geometry.coordinates]

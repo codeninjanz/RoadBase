@@ -98,12 +98,16 @@ class LayerController extends Controller
             LIMIT ?
         SQL, [$tolerance, $kind, $this->bboxWkt($minLng, $minLat, $maxLng, $maxLat), self::MAX_FEATURES]);
 
-        return response()->json([
-            'type' => 'FeatureCollection',
-            'features' => array_map(fn ($row) => [
+        $features = [];
+        foreach ($rows as $row) {
+            $geom = $row->geojson !== null ? json_decode($row->geojson, true) : null;
+            if (! is_array($geom) || empty($geom['type'])) {
+                continue; // skip rows where ST_Simplify collapsed the geometry
+            }
+            $features[] = [
                 'type' => 'Feature',
                 'id' => $row->id,
-                'geometry' => json_decode($row->geojson, true),
+                'geometry' => $geom,
                 'properties' => [
                     'id' => $row->id,
                     'road_name' => $row->road_name,
@@ -112,7 +116,12 @@ class LayerController extends Controller
                     'speed_limit_kmh' => $row->speed_limit_kmh !== null ? (int) $row->speed_limit_kmh : null,
                     'speed_limit_type' => $row->speed_limit_type,
                 ],
-            ], $rows),
+            ];
+        }
+
+        return response()->json([
+            'type' => 'FeatureCollection',
+            'features' => $features,
         ]);
     }
 
@@ -140,19 +149,28 @@ class LayerController extends Controller
             LIMIT ?
         SQL, [$tolerance, $this->bboxWkt($minLng, $minLat, $maxLng, $maxLat), self::MAX_FEATURES]);
 
-        return response()->json([
-            'type' => 'FeatureCollection',
-            'features' => array_map(fn ($row) => [
+        $features = [];
+        foreach ($rows as $row) {
+            $geom = $row->geojson !== null ? json_decode($row->geojson, true) : null;
+            if (! is_array($geom) || empty($geom['type'])) {
+                continue;
+            }
+            $features[] = [
                 'type' => 'Feature',
                 'id' => $row->id,
-                'geometry' => json_decode($row->geojson, true),
+                'geometry' => $geom,
                 'properties' => [
                     'id' => $row->id,
                     'code' => $row->code,
                     'name' => $row->name,
                     'kind' => $row->kind,
                 ],
-            ], $rows),
+            ];
+        }
+
+        return response()->json([
+            'type' => 'FeatureCollection',
+            'features' => $features,
         ]);
     }
 
