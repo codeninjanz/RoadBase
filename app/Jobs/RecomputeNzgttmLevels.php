@@ -36,7 +36,7 @@ class RecomputeNzgttmLevels implements ShouldQueue
 
     private function snapSpeedLimitsToSites(): void
     {
-        // See NzgttmRecomputeCommand for the SRID-0 round-trip rationale.
+        // No ORDER BY — see NzgttmRecomputeCommand for rationale.
         DB::statement(<<<'SQL'
             UPDATE count_sites cs
             JOIN LATERAL (
@@ -45,7 +45,6 @@ class RecomputeNzgttmLevels implements ShouldQueue
                 WHERE rs.kind = 'speed_limit'
                   AND MBRContains(rs.geom, cs.location)
                   AND ST_Contains(rs.geom, cs.location)
-                ORDER BY ST_Area(ST_GeomFromText(ST_AsText(rs.geom), 0)) ASC
                 LIMIT 1
             ) z ON TRUE
             SET cs.speed_limit_kmh = z.speed_limit_kmh
