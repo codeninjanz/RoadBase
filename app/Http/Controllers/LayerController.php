@@ -65,8 +65,8 @@ class LayerController extends Controller
         [$minLng, $minLat, $maxLng, $maxLat] = $this->parseBbox($request);
         // Currently only NSLR speed-limit zones are ingested. Kind kept as a
         // param so future line/segment sources can plug in without API churn.
-        $kind = $request->string('kind', 'speed_limit')->whenIn(['speed_limit'])->toString();
-        if ($kind === '') {
+        $kind = (string) $request->string('kind', 'speed_limit');
+        if (! in_array($kind, ['speed_limit'], true)) {
             return response()->json(['error' => 'kind must be speed_limit'], 422);
         }
 
