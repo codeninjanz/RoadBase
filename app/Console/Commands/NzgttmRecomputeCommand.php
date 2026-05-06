@@ -44,22 +44,28 @@ class NzgttmRecomputeCommand extends Command
         $bar->setFormat(' %current%/%max% [%bar%] %percent:3s%%  %elapsed:6s% / ~%estimated:-6s%');
         $bar->start();
 
+        // Scalar-subquery SET form is consistently faster than LATERAL on
+        // shared MySQL. Plus we read the site's location once, so the
+        // optimiser can pin the spatial index lookup to a single point.
         $matched = 0;
         foreach ($sites as $row) {
-            $affected = DB::affectingStatement(<<<'SQL'
-                UPDATE count_sites cs
-                JOIN LATERAL (
-                    SELECT rs.speed_limit_kmh
-                    FROM road_segments rs
-                    WHERE rs.kind = 'speed_limit'
-                      AND MBRContains(rs.geom, cs.location)
-                      AND ST_Contains(rs.geom, cs.location)
-                    LIMIT 1
-                ) z ON TRUE
-                SET cs.speed_limit_kmh = z.speed_limit_kmh
+            $hit = DB::selectOne(<<<'SQL'
+                SELECT rs.speed_limit_kmh AS speed
+                FROM count_sites cs
+                JOIN road_segments rs FORCE INDEX (road_segments_geom_spatial)
+                  ON rs.kind = 'speed_limit'
+                 AND MBRContains(rs.geom, cs.location)
                 WHERE cs.id = ?
+                  AND ST_Contains(rs.geom, cs.location)
+                LIMIT 1
             SQL, [$row->id]);
-            $matched += $affected;
+
+            if ($hit !== null && $hit->speed !== null) {
+                DB::update('UPDATE count_sites SET speed_limit_kmh = ? WHERE id = ?', [
+                    (int) $hit->speed, $row->id,
+                ]);
+                $matched++;
+            }
             $bar->advance();
         }
 
