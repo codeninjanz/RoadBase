@@ -327,15 +327,24 @@ function useRcaPolygons(
                 try {
                     const polygon = new google.maps.Polygon({
                         paths,
-                        strokeColor: RCA_STROKE,
-                        strokeOpacity: 0.9,
-                        strokeWeight: 2,
+                        strokeColor: '#ff0000',
+                        strokeOpacity: 1.0,
+                        strokeWeight: 4,
                         fillColor: fill,
-                        fillOpacity: 0.18,
+                        fillOpacity: 0.45,
                         clickable: false,
+                        zIndex: 1000,
                         map,
                     });
                     polygonsRef.current.push(polygon);
+                    if (drew === 0) {
+                        const firstRing = paths[0] ?? [];
+                        console.log('[roadbase] sample polygon for', feat.properties?.name,
+                            'rings=', paths.length,
+                            'firstRingLen=', firstRing.length,
+                            'firstVertex=', firstRing[0],
+                            'lastVertex=', firstRing[firstRing.length - 1]);
+                    }
                     drew++;
                 } catch (err) {
                     console.warn('[roadbase] polygon ctor failed for', feat.properties?.name, err);
