@@ -22,7 +22,7 @@ export function LayerToggles({
                     checked={showSpeedLimits}
                     onChange={(e) => onToggleSpeedLimits(e.target.checked)}
                 />
-                Speed limits (NSLR, zoom &ge; 11)
+                Speed limits (zoom in for detail)
             </label>
             <label className="flex min-h-[36px] items-center gap-2">
                 <input

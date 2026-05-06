@@ -84,7 +84,7 @@ function BboxLayers({
                 fetchSites(bbox, zoom, ac.signal)
                     .then(setSites)
                     .catch(() => {});
-                if (showSpeedLimits && zoom >= 11) {
+                if (showSpeedLimits && zoom >= 8) {
                     fetchSpeedLimitZones(bbox, zoom, ac.signal)
                         .then(setZones)
                         .catch(() => {});
