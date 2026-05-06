@@ -28,6 +28,11 @@ class NzgttmRecomputeCommand extends Command
         $this->info('Phase 1: snapping NSLR speed-limit zone → count_sites.speed_limit_kmh…');
         $started = microtime(true);
 
+        // ST_Area on geographic MULTIPOLYGON silently produces no rows in
+        // MySQL 8 (same restriction family as ST_Simplify / ST_Centroid).
+        // Round-trip the geometry through SRID 0 (Cartesian) just for the
+        // size sort — degree-squared ranking is fine since we only need
+        // smallest-first ordering, not absolute area in m².
         DB::statement(<<<'SQL'
             UPDATE count_sites cs
             JOIN LATERAL (
@@ -36,7 +41,7 @@ class NzgttmRecomputeCommand extends Command
                 WHERE rs.kind = 'speed_limit'
                   AND MBRContains(rs.geom, cs.location)
                   AND ST_Contains(rs.geom, cs.location)
-                ORDER BY ST_Area(rs.geom) ASC
+                ORDER BY ST_Area(ST_GeomFromText(ST_AsText(rs.geom), 0)) ASC
                 LIMIT 1
             ) z ON TRUE
             SET cs.speed_limit_kmh = z.speed_limit_kmh
