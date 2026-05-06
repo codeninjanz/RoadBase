@@ -69,36 +69,55 @@ function BboxLayers({
 
     useEffect(() => {
         if (!map) return;
+        console.log('[roadbase] BboxLayers effect:', { showSpeedLimits, showRcas });
+
         const refresh = () => {
             if (debounceRef.current) window.clearTimeout(debounceRef.current);
             debounceRef.current = window.setTimeout(() => {
                 const bounds = map.getBounds();
                 const zoom = map.getZoom() ?? 6;
-                if (!bounds) return;
+                if (!bounds) {
+                    console.warn('[roadbase] no bounds yet, skipping refresh');
+                    return;
+                }
                 const sw = bounds.getSouthWest();
                 const ne = bounds.getNorthEast();
                 const bbox: Bbox = [sw.lng(), sw.lat(), ne.lng(), ne.lat()];
+                console.log('[roadbase] refresh', { zoom, bbox, showSpeedLimits, showRcas });
 
                 const ac = new AbortController();
                 fetchSites(bbox, zoom, ac.signal)
-                    .then(setSites)
-                    .catch(() => {});
+                    .then((fc) => {
+                        console.log('[roadbase] sites response', fc.features.length);
+                        setSites(fc);
+                    })
+                    .catch((e) => console.warn('[roadbase] sites fetch failed', e));
                 if (showSpeedLimits && zoom >= 11) {
+                    console.log('[roadbase] fetching speed zones');
                     fetchSpeedLimitZones(bbox, zoom, ac.signal)
-                        .then(setZones)
-                        .catch(() => {});
+                        .then((fc) => {
+                            console.log('[roadbase] zones response', fc.features.length);
+                            setZones(fc);
+                        })
+                        .catch((e) => console.warn('[roadbase] zones fetch failed', e));
                 } else {
+                    if (showSpeedLimits) {
+                        console.log('[roadbase] zoom < 11 (got', zoom, ') — speed zones suppressed');
+                    }
                     setZones(null);
                 }
-                // RCA polygons are large multi-polygons; only fetch above
-                // zoom 7 so we don't ship 25MB of GeoJSON for the whole NZ
-                // viewport at low zooms. The polygons are visible at the
-                // scales TMP authors actually plan against.
                 if (showRcas && zoom >= 7) {
+                    console.log('[roadbase] fetching rcas');
                     fetchRcas(bbox, zoom, ac.signal)
-                        .then(setRcas)
-                        .catch(() => {});
+                        .then((fc) => {
+                            console.log('[roadbase] rcas response', fc.features.length, 'first:', fc.features[0]);
+                            setRcas(fc);
+                        })
+                        .catch((e) => console.warn('[roadbase] rcas fetch failed', e));
                 } else {
+                    if (showRcas) {
+                        console.log('[roadbase] zoom < 7 (got', zoom, ') — rcas suppressed');
+                    }
                     setRcas(null);
                 }
             }, 250);
@@ -273,12 +292,20 @@ function useRcaPolygons(
     const polygonsRef = useRef<google.maps.Polygon[]>([]);
 
     useEffect(() => {
-        if (!map) return;
+        if (!map) {
+            console.log('[roadbase] useRcaPolygons: no map yet');
+            return;
+        }
         polygonsRef.current.forEach((p) => p.setMap(null));
         polygonsRef.current = [];
 
-        if (!fc) return;
+        if (!fc) {
+            console.log('[roadbase] useRcaPolygons: no fc, polygons cleared');
+            return;
+        }
 
+        console.log('[roadbase] useRcaPolygons: rendering', fc.features.length, 'features');
+        let drew = 0;
         for (const feat of fc.features) {
             const ringSets =
                 feat.geometry.type === 'Polygon'
@@ -288,25 +315,37 @@ function useRcaPolygons(
             const fill = rcaFill(feat.id);
 
             for (const polygonRings of ringSets) {
-                if (!Array.isArray(polygonRings) || polygonRings.length === 0) continue;
+                if (!Array.isArray(polygonRings) || polygonRings.length === 0) {
+                    console.log('[roadbase] skip empty ringSet for', feat.properties?.name);
+                    continue;
+                }
                 const paths = polygonRings
                     .filter((ring) => Array.isArray(ring) && ring.length >= 3)
                     .map((ring) => ring.map(([lng, lat]) => ({ lat, lng })));
-                if (paths.length === 0) continue;
+                if (paths.length === 0) {
+                    console.log('[roadbase] skip degenerate paths for', feat.properties?.name);
+                    continue;
+                }
 
-                const polygon = new google.maps.Polygon({
-                    paths,
-                    strokeColor: RCA_STROKE,
-                    strokeOpacity: 0.9,
-                    strokeWeight: 2,
-                    fillColor: fill,
-                    fillOpacity: 0.18,
-                    clickable: false,
-                    map,
-                });
-                polygonsRef.current.push(polygon);
+                try {
+                    const polygon = new google.maps.Polygon({
+                        paths,
+                        strokeColor: RCA_STROKE,
+                        strokeOpacity: 0.9,
+                        strokeWeight: 2,
+                        fillColor: fill,
+                        fillOpacity: 0.18,
+                        clickable: false,
+                        map,
+                    });
+                    polygonsRef.current.push(polygon);
+                    drew++;
+                } catch (err) {
+                    console.warn('[roadbase] polygon ctor failed for', feat.properties?.name, err);
+                }
             }
         }
+        console.log('[roadbase] useRcaPolygons: drew', drew, 'polygons total');
 
         return () => {
             polygonsRef.current.forEach((p) => p.setMap(null));
