@@ -46,28 +46,26 @@ class DataSourceSeeder extends Seeder
                 'url' => 'https://nzta.opendata.arcgis.com/',
                 'update_frequency_hours' => 24 * 30,
             ],
-            [
-                'key' => 'at_adt',
-                'name' => 'Auckland Transport Average Daily Traffic',
-                'url' => 'https://data-atgis.opendata.arcgis.com/datasets/ATgis::average-daily-traffic-counts',
-                'update_frequency_hours' => 24 * 7,
-            ],
-            [
-                'key' => 'hcc',
-                'name' => 'Hamilton City Traffic Counts',
-                'url' => 'https://data-waikatolass.opendata.arcgis.com/maps/hcc::hamilton-city-traffic-counts',
-                'update_frequency_hours' => 24 * 30,
-            ],
-            [
-                'key' => 'ccc',
-                'name' => 'Christchurch City Traffic Counts',
-                'url' => 'https://ccc.govt.nz/transport/improving-our-transport-and-roads/traffic-count-data',
-                'update_frequency_hours' => 24 * 30,
-            ],
         ];
 
         foreach ($sources as $source) {
             DataSource::updateOrCreate(['key' => $source['key']], $source);
+        }
+
+        // Council / district-council traffic-count sources are registered from
+        // config/council_sources.php so the registry stays in one place. The
+        // sync no-ops for any RCA whose FeatureServer URL isn't set in .env,
+        // but the DataSource row still appears on /about as a known feed.
+        foreach (config('council_sources', []) as $key => $cfg) {
+            DataSource::updateOrCreate(
+                ['key' => $key],
+                [
+                    'key' => $key,
+                    'name' => $cfg['name'] ?? $key,
+                    'url' => $cfg['url'] ?? null,
+                    'update_frequency_hours' => 24 * 30,
+                ],
+            );
         }
     }
 }
