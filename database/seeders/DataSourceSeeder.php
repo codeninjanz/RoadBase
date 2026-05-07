@@ -41,6 +41,12 @@ class DataSourceSeeder extends Seeder
                 'update_frequency_hours' => 24 * 90,
             ],
             [
+                'key' => 'nz_roads_centrelines',
+                'name' => 'NZ Roads Centrelines (NZTA, all RCAs)',
+                'url' => 'https://nzta.opendata.arcgis.com/',
+                'update_frequency_hours' => 24 * 30,
+            ],
+            [
                 'key' => 'at_adt',
                 'name' => 'Auckland Transport Average Daily Traffic',
                 'url' => 'https://data-atgis.opendata.arcgis.com/datasets/ATgis::average-daily-traffic-counts',

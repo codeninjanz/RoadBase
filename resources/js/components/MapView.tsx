@@ -1,9 +1,10 @@
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
 import { useEffect, useRef, useState } from 'react';
 import type { Bbox } from '@/lib/api';
-import { fetchRcas, fetchSites, fetchSpeedLimitZones } from '@/lib/api';
+import { fetchCentrelines, fetchRcas, fetchSites, fetchSpeedLimitZones } from '@/lib/api';
 import { speedColour } from '@/lib/nzgttm';
 import type {
+    CentrelineFeature,
     FeatureCollection,
     RcaFeature,
     SiteFeature,
@@ -15,11 +16,12 @@ interface Props {
     onSelect: (siteId: number) => void;
     showSpeedLimits: boolean;
     showRcas: boolean;
+    showCentrelines: boolean;
 }
 
 const NZ_CENTRE = { lat: -41.0, lng: 174.0 };
 
-export function MapView({ apiKey, onSelect, showSpeedLimits, showRcas }: Props) {
+export function MapView({ apiKey, onSelect, showSpeedLimits, showRcas, showCentrelines }: Props) {
     if (!apiKey) {
         return (
             <div className="flex h-full items-center justify-center bg-gray-50 text-center text-sm text-gray-600">
@@ -44,6 +46,7 @@ export function MapView({ apiKey, onSelect, showSpeedLimits, showRcas }: Props) 
                     onSelect={onSelect}
                     showSpeedLimits={showSpeedLimits}
                     showRcas={showRcas}
+                    showCentrelines={showCentrelines}
                 />
                 <MyLocationControl />
             </Map>
@@ -55,15 +58,19 @@ function BboxLayers({
     onSelect,
     showSpeedLimits,
     showRcas,
+    showCentrelines,
 }: {
     onSelect: (id: number) => void;
     showSpeedLimits: boolean;
     showRcas: boolean;
+    showCentrelines: boolean;
 }) {
     const map = useMap();
     const [sites, setSites] = useState<FeatureCollection<SiteFeature> | null>(null);
     const [zones, setZones] = useState<FeatureCollection<SpeedLimitZoneFeature> | null>(null);
     const [rcas, setRcas] = useState<FeatureCollection<RcaFeature> | null>(null);
+    const [centrelines, setCentrelines] =
+        useState<FeatureCollection<CentrelineFeature> | null>(null);
 
     const debounceRef = useRef<number | null>(null);
 
@@ -98,16 +105,26 @@ function BboxLayers({
                 } else {
                     setRcas(null);
                 }
+                // Server-side hierarchy filter keeps low-zoom payloads small
+                // (motorways only at z<9), so we can refresh on every pan.
+                if (showCentrelines) {
+                    fetchCentrelines(bbox, zoom, ac.signal)
+                        .then(setCentrelines)
+                        .catch(() => {});
+                } else {
+                    setCentrelines(null);
+                }
             }, 250);
         };
         const idle = map.addListener('idle', refresh);
         refresh();
         return () => idle.remove();
-    }, [map, showSpeedLimits, showRcas]);
+    }, [map, showSpeedLimits, showRcas, showCentrelines]);
 
     useSiteMarkers(map, sites, onSelect);
     useZonePolygons(map, zones);
     useRcaPolygons(map, rcas);
+    useCentrelinePolylines(map, centrelines);
 
     return null;
 }
@@ -357,6 +374,87 @@ function useRcaPolygons(
             listenersRef.current.forEach((l) => l.remove());
             listenersRef.current = [];
             infoWindowRef.current?.close();
+        };
+    }, [map, fc]);
+}
+
+/**
+ * Style centreline polylines by road hierarchy. Vocabulary in the upstream
+ * NZ Roads feed is free-form ("Motorway", "Primary Collector", "Local",
+ * "1 - Motorway", ...), so match on lowercase substrings rather than exact
+ * values. Falls through to a neutral "minor road" style for anything we
+ * don't recognise (e.g. tracks, paper roads).
+ */
+function centrelineStyle(hierarchy: string | null): {
+    color: string;
+    weight: number;
+    opacity: number;
+    zIndex: number;
+} {
+    const h = (hierarchy ?? '').toLowerCase();
+    if (h.includes('motorway') || h.includes('expressway')) {
+        return { color: '#dc2626', weight: 3.0, opacity: 0.9, zIndex: 40 };
+    }
+    if (h.includes('arterial') || h.includes('primary')) {
+        return { color: '#ea580c', weight: 2.2, opacity: 0.85, zIndex: 30 };
+    }
+    if (h.includes('collector') || h.includes('secondary')) {
+        return { color: '#ca8a04', weight: 1.6, opacity: 0.8, zIndex: 20 };
+    }
+    return { color: '#475569', weight: 1.0, opacity: 0.7, zIndex: 10 };
+}
+
+function useCentrelinePolylines(
+    map: google.maps.Map | null,
+    fc: FeatureCollection<CentrelineFeature> | null,
+) {
+    const polylinesRef = useRef<google.maps.Polyline[]>([]);
+
+    useEffect(() => {
+        if (!map) return;
+        polylinesRef.current.forEach((p) => p.setMap(null));
+        polylinesRef.current = [];
+
+        if (!fc) return;
+
+        for (const feat of fc.features) {
+            if (!feat.geometry || !feat.geometry.type) continue;
+            const lineSets =
+                feat.geometry.type === 'LineString'
+                    ? [feat.geometry.coordinates]
+                    : feat.geometry.coordinates;
+
+            const style = centrelineStyle(feat.properties.hierarchy);
+            const title = feat.properties.road_name
+                ? feat.properties.rca
+                    ? `${feat.properties.road_name} — ${feat.properties.rca}`
+                    : feat.properties.road_name
+                : (feat.properties.rca ?? '');
+
+            for (const coords of lineSets) {
+                if (!Array.isArray(coords) || coords.length < 2) continue;
+                const path = coords.map((p) => vertexToLatLng(p as [number, number]));
+                const polyline = new google.maps.Polyline({
+                    path,
+                    strokeColor: style.color,
+                    strokeOpacity: style.opacity,
+                    strokeWeight: style.weight,
+                    zIndex: style.zIndex,
+                    clickable: false,
+                    map,
+                });
+                if (title) {
+                    // Polylines don't render a title attr like markers; stash it
+                    // on the instance so a future hover-tooltip hook can pick it up.
+                    (polyline as unknown as { __title?: string }).__title = title;
+                }
+                polylinesRef.current.push(polyline);
+            }
+        }
+
+        return () => {
+            polylinesRef.current.forEach((p) => p.setMap(null));
+            polylinesRef.current = [];
         };
     }, [map, fc]);
 }

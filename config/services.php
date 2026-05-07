@@ -54,5 +54,8 @@ return [
     'stats_nz' => [
         'ta_url' => env('STATS_NZ_TA_URL'),
     ],
+    'nz_roads' => [
+        'centrelines_url' => env('NZ_ROADS_CENTRELINES_URL'),
+    ],
 
 ];

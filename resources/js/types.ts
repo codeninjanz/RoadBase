@@ -47,6 +47,23 @@ export interface RcaFeature {
     };
 }
 
+export type LineGeometry =
+    | { type: 'LineString'; coordinates: [number, number][] }
+    | { type: 'MultiLineString'; coordinates: [number, number][][] };
+
+export interface CentrelineFeature {
+    type: 'Feature';
+    id: number;
+    geometry: LineGeometry;
+    properties: {
+        id: number;
+        road_name: string | null;
+        rca: string | null;
+        rca_code: string | null;
+        hierarchy: string | null;
+    };
+}
+
 export interface FeatureCollection<F> {
     type: 'FeatureCollection';
     features: F[];

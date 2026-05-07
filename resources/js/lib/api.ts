@@ -1,4 +1,5 @@
 import type {
+    CentrelineFeature,
     FeatureCollection,
     RcaFeature,
     SiteDetail,
@@ -42,6 +43,13 @@ export function fetchCrashes(b: Bbox, z: number, signal?: AbortSignal) {
 export function fetchRcas(b: Bbox, z: number, signal?: AbortSignal) {
     return getJson<FeatureCollection<RcaFeature>>(
         `/api/layers/rcas?bbox=${bboxParam(b)}&z=${z}`,
+        signal,
+    );
+}
+
+export function fetchCentrelines(b: Bbox, z: number, signal?: AbortSignal) {
+    return getJson<FeatureCollection<CentrelineFeature>>(
+        `/api/layers/segments?bbox=${bboxParam(b)}&z=${z}&kind=centreline`,
         signal,
     );
 }

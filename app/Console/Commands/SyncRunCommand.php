@@ -5,13 +5,14 @@ namespace App\Console\Commands;
 use App\Jobs\RecomputeNzgttmLevels;
 use App\Sync\AbstractSyncJob;
 use App\Sync\NslrSpeedLimitSync;
+use App\Sync\NzRoadsCentrelineSync;
 use App\Sync\NztaStateHighwayAadtSync;
 use App\Sync\RcaTaSync;
 use Illuminate\Console\Command;
 
 class SyncRunCommand extends Command
 {
-    protected $signature = 'sync:run {source : Source key (nzta_aadt, nslr, all)} {--force : Run even if last sync is fresh} {--no-recompute : Skip the NZGTTM recompute after run}';
+    protected $signature = 'sync:run {source : Source key (nzta_aadt, nslr, stats_nz_ta, nz_roads_centrelines, all)} {--force : Run even if last sync is fresh} {--no-recompute : Skip the NZGTTM recompute after run}';
 
     protected $description = 'Run a data-source sync inline (not queued).';
 
@@ -20,6 +21,7 @@ class SyncRunCommand extends Command
         'nzta_aadt' => NztaStateHighwayAadtSync::class,
         'nslr' => NslrSpeedLimitSync::class,
         'stats_nz_ta' => RcaTaSync::class,
+        'nz_roads_centrelines' => NzRoadsCentrelineSync::class,
     ];
 
     public function handle(): int
