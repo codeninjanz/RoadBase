@@ -45,7 +45,18 @@ class CouncilTrafficCountSync implements ShouldQueue
             return;
         }
 
-        $source = DataSource::where('key', $this->sourceKey)->firstOrFail();
+        // Self-heal: create the data_sources row from the registry on first
+        // run so operators don't have to re-seed every time a new RCA is
+        // added to config/council_sources.php.
+        $source = DataSource::updateOrCreate(
+            ['key' => $this->sourceKey],
+            [
+                'key' => $this->sourceKey,
+                'name' => $cfg['name'] ?? $this->sourceKey,
+                'url' => $cfg['url'] ?? null,
+                'update_frequency_hours' => $cfg['update_frequency_hours'] ?? 24 * 30,
+            ],
+        );
 
         if (! $this->force && ! $source->isStale()) {
             Log::info("Skipping council sync for {$source->key} — last sync is fresh.");
