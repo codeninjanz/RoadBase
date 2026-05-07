@@ -10,6 +10,7 @@ export default function MapPage() {
     const [selected, setSelected] = useState<number | null>(null);
     const [showSpeedLimits, setShowSpeedLimits] = useState(false);
     const [showRcas, setShowRcas] = useState(false);
+    const [showCentrelines, setShowCentrelines] = useState(false);
 
     return (
         <>
@@ -42,12 +43,15 @@ export default function MapPage() {
                         onSelect={setSelected}
                         showSpeedLimits={showSpeedLimits}
                         showRcas={showRcas}
+                        showCentrelines={showCentrelines}
                     />
                     <LayerToggles
                         showSpeedLimits={showSpeedLimits}
                         onToggleSpeedLimits={setShowSpeedLimits}
                         showRcas={showRcas}
                         onToggleRcas={setShowRcas}
+                        showCentrelines={showCentrelines}
+                        onToggleCentrelines={setShowCentrelines}
                     />
                     {selected !== null && (
                         <SiteDetailPanel siteId={selected} onClose={() => setSelected(null)} />

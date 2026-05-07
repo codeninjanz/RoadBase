@@ -5,6 +5,8 @@ interface Props {
     onToggleSpeedLimits: (next: boolean) => void;
     showRcas: boolean;
     onToggleRcas: (next: boolean) => void;
+    showCentrelines: boolean;
+    onToggleCentrelines: (next: boolean) => void;
 }
 
 export function LayerToggles({
@@ -12,6 +14,8 @@ export function LayerToggles({
     onToggleSpeedLimits,
     showRcas,
     onToggleRcas,
+    showCentrelines,
+    onToggleCentrelines,
 }: Props) {
     return (
         <div className="absolute bottom-4 left-4 z-10 w-64 rounded-lg bg-white p-3 text-sm shadow-lg">
@@ -31,6 +35,14 @@ export function LayerToggles({
                     onChange={(e) => onToggleRcas(e.target.checked)}
                 />
                 RCA boundaries
+            </label>
+            <label className="flex min-h-[36px] items-center gap-2">
+                <input
+                    type="checkbox"
+                    checked={showCentrelines}
+                    onChange={(e) => onToggleCentrelines(e.target.checked)}
+                />
+                Local roads (centrelines)
             </label>
 
             <div className="mt-3 border-t pt-2">

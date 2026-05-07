@@ -63,27 +63,28 @@ class LayerController extends Controller
     public function segments(Request $request): JsonResponse
     {
         [$minLng, $minLat, $maxLng, $maxLat] = $this->parseBbox($request);
-        // Currently only NSLR speed-limit zones are ingested. Kind kept as a
-        // param so future line/segment sources can plug in without API churn.
         $kind = (string) $request->string('kind', 'speed_limit');
-        if (! in_array($kind, ['speed_limit'], true)) {
-            return response()->json(['error' => 'kind must be speed_limit'], 422);
+        if (! in_array($kind, ['speed_limit', 'centreline'], true)) {
+            return response()->json(['error' => 'kind must be speed_limit or centreline'], 422);
         }
 
         $zoom = (int) $request->integer('z', 12);
         $tolerance = $this->simplifyToleranceFor($zoom);
 
-        // ST_Simplify on geographic MULTIPOLYGON fails in MySQL 8. Round-trip
+        // ST_Simplify on geographic geometries fails in MySQL 8. Round-trip
         // through SRID 0 to do the simplification in Cartesian space; same
         // workaround used by the rcas endpoint. ST_AsGeoJSON on the resulting
         // SRID-0 geometry emits coords in stored axis order — the client
         // already swaps via vertexToLatLng().
-        $rows = DB::select(<<<'SQL'
+        $bindings = [$tolerance, $kind, $this->bboxWkt($minLng, $minLat, $maxLng, $maxLat)];
+        $sql = <<<'SQL'
             SELECT
                 rs.id,
                 rs.road_name,
                 rs.zone_name,
                 rs.rca,
+                rs.rca_code,
+                rs.hierarchy,
                 rs.speed_limit_kmh,
                 rs.speed_limit_type,
                 ST_AsGeoJSON(
@@ -95,8 +96,27 @@ class LayerController extends Controller
                     ST_SRID(ST_GeomFromText(?), 4326),
                     rs.geom
                   )
-            LIMIT ?
-        SQL, [$tolerance, $kind, $this->bboxWkt($minLng, $minLat, $maxLng, $maxLat), self::MAX_FEATURES]);
+        SQL;
+
+        // For centrelines, filter by road hierarchy at low zoom so we don't
+        // ship every Local street nationwide. Vocabulary varies by upstream
+        // vintage so use case-insensitive substring matches.
+        if ($kind === 'centreline') {
+            $patterns = $this->centrelineHierarchyPatternsFor($zoom);
+            if ($patterns !== null) {
+                $clauses = [];
+                foreach ($patterns as $p) {
+                    $clauses[] = 'LOWER(rs.hierarchy) LIKE ?';
+                    $bindings[] = $p;
+                }
+                $sql .= ' AND ('.implode(' OR ', $clauses).')';
+            }
+        }
+
+        $sql .= ' LIMIT ?';
+        $bindings[] = self::MAX_FEATURES;
+
+        $rows = DB::select($sql, $bindings);
 
         $features = [];
         foreach ($rows as $row) {
@@ -104,18 +124,24 @@ class LayerController extends Controller
             if (! is_array($geom) || empty($geom['type'])) {
                 continue; // skip rows where ST_Simplify collapsed the geometry
             }
+            $properties = [
+                'id' => $row->id,
+                'road_name' => $row->road_name,
+                'rca' => $row->rca,
+            ];
+            if ($kind === 'speed_limit') {
+                $properties['zone_name'] = $row->zone_name;
+                $properties['speed_limit_kmh'] = $row->speed_limit_kmh !== null ? (int) $row->speed_limit_kmh : null;
+                $properties['speed_limit_type'] = $row->speed_limit_type;
+            } else {
+                $properties['rca_code'] = $row->rca_code;
+                $properties['hierarchy'] = $row->hierarchy;
+            }
             $features[] = [
                 'type' => 'Feature',
                 'id' => $row->id,
                 'geometry' => $geom,
-                'properties' => [
-                    'id' => $row->id,
-                    'road_name' => $row->road_name,
-                    'zone_name' => $row->zone_name,
-                    'rca' => $row->rca,
-                    'speed_limit_kmh' => $row->speed_limit_kmh !== null ? (int) $row->speed_limit_kmh : null,
-                    'speed_limit_type' => $row->speed_limit_type,
-                ],
+                'properties' => $properties,
             ];
         }
 
@@ -123,6 +149,27 @@ class LayerController extends Controller
             'type' => 'FeatureCollection',
             'features' => $features,
         ]);
+    }
+
+    /**
+     * Hierarchy substring patterns to include at a given zoom. Returning null
+     * means "no filter — return every centreline in the bbox". Lower zooms
+     * keep only the trunk network so the response stays under MAX_FEATURES.
+     *
+     * @return list<string>|null
+     */
+    private function centrelineHierarchyPatternsFor(int $zoom): ?array
+    {
+        if ($zoom >= 13) {
+            return null;
+        }
+        if ($zoom >= 11) {
+            return ['%motorway%', '%expressway%', '%arterial%', '%primary%', '%collector%', '%secondary%'];
+        }
+        if ($zoom >= 9) {
+            return ['%motorway%', '%expressway%', '%arterial%', '%primary%'];
+        }
+        return ['%motorway%', '%expressway%'];
     }
 
     public function rcas(Request $request): JsonResponse
