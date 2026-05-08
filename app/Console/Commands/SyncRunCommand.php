@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\RecomputeNzgttmLevels;
 use App\Sync\AbstractSyncJob;
 use App\Sync\CouncilTrafficCountSync;
 use App\Sync\NslrSpeedLimitSync;
@@ -13,7 +12,7 @@ use Illuminate\Console\Command;
 
 class SyncRunCommand extends Command
 {
-    protected $signature = 'sync:run {source : Source key (nzta_aadt, nslr, stats_nz_ta, nz_roads_centrelines, councils, all, or any council key)} {--force : Run even if last sync is fresh} {--no-recompute : Skip the NZGTTM recompute after run}';
+    protected $signature = 'sync:run {source : Source key (nzta_aadt, nslr, stats_nz_ta, nz_roads_centrelines, councils, all, or any council key)} {--force : Run even if last sync is fresh} {--no-recompute : Skip the NSLR speed-limit snap after run}';
 
     protected $description = 'Run a data-source sync inline (not queued).';
 
@@ -59,10 +58,18 @@ class SyncRunCommand extends Command
             return self::FAILURE;
         }
 
-        if (! $this->option('no-recompute')) {
-            $this->info('Recomputing NZGTTM levels…');
-            (new RecomputeNzgttmLevels)->handle();
-            $this->info('Recompute done.');
+        // Only the NSLR speed-limit zones change what gets snapped onto
+        // count_sites — running the snap after a council/AADT sync just
+        // rescans the same zones for no new effect. Skip unless we just
+        // imported NSLR. nzgttm:recompute is the canonical entry point
+        // (chunked + progress bar); the bulk LATERAL UPDATE in
+        // RecomputeNzgttmLevels::snapSpeedLimitsToSites is the codepath
+        // its own docstring warns "stalls indefinitely on shared MySQL".
+        $shouldRecompute = ! $this->option('no-recompute')
+            && in_array('nslr', $keys, true);
+        if ($shouldRecompute) {
+            $this->info('Recomputing NSLR speed-limit snap (chunked, with progress bar)…');
+            $this->call('nzgttm:recompute');
         }
 
         return self::SUCCESS;

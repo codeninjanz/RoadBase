@@ -1,10 +1,10 @@
 <?php
 
-use App\Jobs\RecomputeNzgttmLevels;
 use App\Sync\CouncilTrafficCountSync;
 use App\Sync\NslrSpeedLimitSync;
 use App\Sync\NzRoadsCentrelineSync;
 use App\Sync\NztaStateHighwayAadtSync;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::job(new NztaStateHighwayAadtSync)
@@ -12,11 +12,16 @@ Schedule::job(new NztaStateHighwayAadtSync)
     ->name('sync_nzta_aadt')
     ->onOneServer();
 
+// After the NSLR sync, run the chunked nzgttm:recompute command rather
+// than dispatching RecomputeNzgttmLevels — the bulk LATERAL UPDATE in
+// that job's snapSpeedLimitsToSites() stalls indefinitely on shared
+// MySQL (its own docstring warns about it). The artisan command uses
+// the per-site chunked path with FORCE INDEX.
 Schedule::job(new NslrSpeedLimitSync)
     ->dailyAt('03:00')
     ->name('sync_nslr')
     ->onOneServer()
-    ->after(fn () => dispatch(new RecomputeNzgttmLevels));
+    ->after(fn () => Artisan::call('nzgttm:recompute'));
 
 // NZ Roads centrelines change rarely (RCA boundaries / new subdivisions).
 // Monthly is plenty and avoids re-ingesting ~600k segments unnecessarily.
