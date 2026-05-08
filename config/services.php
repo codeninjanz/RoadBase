@@ -51,6 +51,9 @@ return [
     'nslr' => [
         'url' => env('NSLR_FEATURE_URL'),
     ],
+    'cas' => [
+        'url' => env('CAS_FEATURE_URL'),
+    ],
     'stats_nz' => [
         'ta_url' => env('STATS_NZ_TA_URL'),
     ],

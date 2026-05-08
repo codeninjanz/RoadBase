@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Sync\AbstractSyncJob;
+use App\Sync\CasCrashSync;
 use App\Sync\CouncilTrafficCountSync;
 use App\Sync\NslrSpeedLimitSync;
 use App\Sync\NzRoadsCentrelineSync;
@@ -12,7 +13,7 @@ use Illuminate\Console\Command;
 
 class SyncRunCommand extends Command
 {
-    protected $signature = 'sync:run {source : Source key (nzta_aadt, nslr, stats_nz_ta, nz_roads_centrelines, councils, all, or any council key)} {--force : Run even if last sync is fresh} {--no-recompute : Skip the NSLR speed-limit snap after run}';
+    protected $signature = 'sync:run {source : Source key (nzta_aadt, nslr, stats_nz_ta, nz_roads_centrelines, cas, councils, all, or any council key)} {--force : Run even if last sync is fresh} {--no-recompute : Skip the NSLR speed-limit snap after run}';
 
     protected $description = 'Run a data-source sync inline (not queued).';
 
@@ -22,6 +23,7 @@ class SyncRunCommand extends Command
         'nslr' => NslrSpeedLimitSync::class,
         'stats_nz_ta' => RcaTaSync::class,
         'nz_roads_centrelines' => NzRoadsCentrelineSync::class,
+        'cas' => CasCrashSync::class,
     ];
 
     public function handle(): int

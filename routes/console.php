@@ -1,5 +1,6 @@
 <?php
 
+use App\Sync\CasCrashSync;
 use App\Sync\CouncilTrafficCountSync;
 use App\Sync\NslrSpeedLimitSync;
 use App\Sync\NzRoadsCentrelineSync;
@@ -28,6 +29,13 @@ Schedule::job(new NslrSpeedLimitSync)
 Schedule::job(new NzRoadsCentrelineSync)
     ->monthlyOn(1, '04:00')
     ->name('sync_nz_roads_centrelines')
+    ->onOneServer();
+
+// CAS publishes monthly. Run weekly so we pick up republished revisions
+// of recent crashes without doing the ~100k-row pull every day.
+Schedule::job(new CasCrashSync)
+    ->weeklyOn(3, '03:30')
+    ->name('sync_cas')
     ->onOneServer();
 
 // Fan out to every council/RCA traffic-count source registered in
