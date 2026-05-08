@@ -25,7 +25,12 @@
  */
 
 $commonAliases = [
-    'external_id'      => ['siteId', 'SiteID', 'SiteId', 'site_id', 'Site_Number', 'STATION_ID', 'stationId', 'GlobalID', 'globalId', 'OBJECTID'],
+    // GlobalID is universal across ArcGIS hosted feature services and stays
+    // stable across upstream republishes, so it stays the canonical
+    // external_id. Friendlier columns like Site_Number live further down
+    // the list so they're a fallback, not an override — moving them up
+    // would change external_id between runs and double-insert every row.
+    'external_id'      => ['siteId', 'SiteID', 'SiteId', 'site_id', 'STATION_ID', 'stationId', 'GlobalID', 'globalId', 'Site_Number', 'OBJECTID'],
     'road_name'        => ['roadName', 'RoadName', 'road_name', 'Site_Name', 'siteName', 'SiteName', 'site_name', 'Site_Location', 'description', 'Description', 'descr', 'location', 'Location', 'street', 'Street'],
     // For councils that publish AADT as a per-year pivot (Hamilton CC, ...)
     // list Year#### columns most-recent first so first-non-null wins. The
