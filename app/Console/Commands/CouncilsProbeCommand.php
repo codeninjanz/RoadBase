@@ -97,6 +97,23 @@ class CouncilsProbeCommand extends Command
                 } else {
                     $this->warn('  No mapped fields resolved — check config/council_sources.php aliases.');
                 }
+
+                // When debugging a single source, dump every raw property so
+                // you can read off the upstream field names and add the
+                // missing ones to the alias list. Skipped in bulk mode to
+                // keep the all-councils run readable.
+                if ($key !== null) {
+                    $this->newLine();
+                    $this->line('  <fg=cyan>All upstream fields (sample row):</>');
+                    foreach ($props as $name => $value) {
+                        $shown = $value === null ? '<null>'
+                            : (is_scalar($value) ? (string) $value : json_encode($value));
+                        if (mb_strlen($shown) > 80) {
+                            $shown = mb_substr($shown, 0, 77).'…';
+                        }
+                        $this->line(sprintf('    %-32s = %s', $name, $shown));
+                    }
+                }
                 $ok++;
             } catch (\Throwable $e) {
                 $this->error('  Exception: '.$e->getMessage());
