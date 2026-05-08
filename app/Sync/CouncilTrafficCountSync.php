@@ -145,12 +145,23 @@ class CouncilTrafficCountSync implements ShouldQueue
                     continue;
                 }
 
-                $aadt = self::firstInt($props, $aliases['aadt'] ?? []);
+                [$aadt, $aadtAlias] = self::firstIntWithAlias($props, $aliases['aadt'] ?? []);
                 $heavyPct = self::firstFloat($props, $aliases['heavy_pct'] ?? []);
                 $peakVol = self::firstInt($props, $aliases['peak_hour_volume'] ?? []);
                 $speedLimit = self::firstInt($props, $aliases['speed_limit'] ?? []);
                 $countDate = self::firstDate($props, $aliases['count_date'] ?? []);
                 $roadName = self::firstString($props, $aliases['road_name'] ?? []);
+
+                // Per-year pivot feeds (Hamilton CC and similar) carry the
+                // year only in the column name, e.g. AADT came from
+                // 'Year2023'. When the explicit date column is missing,
+                // back-fill count_date as Jan 1 of the matched year so the
+                // detail panel and exports still report when the count was
+                // taken.
+                if ($countDate === null && $aadtAlias !== null
+                    && preg_match('/^Year(\d{4})$/i', $aadtAlias, $m)) {
+                    $countDate = "{$m[1]}-01-01";
+                }
 
                 SiteUpsert::upsert(
                     $source->id,
@@ -201,11 +212,27 @@ class CouncilTrafficCountSync implements ShouldQueue
     /** @param array<string, mixed> $props @param array<int, string> $keys */
     private static function firstInt(array $props, array $keys): ?int
     {
+        return self::firstIntWithAlias($props, $keys)[0];
+    }
+
+    /**
+     * Like firstInt but also returns which alias matched. Lets the caller
+     * derive metadata from the column name (e.g. "Year2023" → count_date
+     * 2023-01-01).
+     *
+     * @param  array<string, mixed>  $props
+     * @param  array<int, string>  $keys
+     * @return array{0:?int, 1:?string}
+     */
+    private static function firstIntWithAlias(array $props, array $keys): array
+    {
         foreach ($keys as $k) {
             $v = $props[$k] ?? null;
-            if (is_numeric($v)) return (int) $v;
+            if (is_numeric($v)) {
+                return [(int) $v, $k];
+            }
         }
-        return null;
+        return [null, null];
     }
 
     /** @param array<string, mixed> $props @param array<int, string> $keys */

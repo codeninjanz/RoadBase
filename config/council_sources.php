@@ -25,9 +25,21 @@
  */
 
 $commonAliases = [
-    'external_id'      => ['siteId', 'SiteID', 'SiteId', 'site_id', 'STATION_ID', 'stationId', 'GlobalID', 'globalId', 'OBJECTID'],
-    'road_name'        => ['roadName', 'RoadName', 'road_name', 'siteName', 'SiteName', 'site_name', 'description', 'Description', 'descr', 'location', 'Location', 'street', 'Street'],
-    'aadt'             => ['aadt', 'AADT', 'adt', 'ADT', 'averageDailyTraffic', 'AverageDailyTraffic', 'volume', 'Volume', 'avgDailyVol', 'AvgDailyVol'],
+    'external_id'      => ['siteId', 'SiteID', 'SiteId', 'site_id', 'Site_Number', 'STATION_ID', 'stationId', 'GlobalID', 'globalId', 'OBJECTID'],
+    'road_name'        => ['roadName', 'RoadName', 'road_name', 'Site_Name', 'siteName', 'SiteName', 'site_name', 'Site_Location', 'description', 'Description', 'descr', 'location', 'Location', 'street', 'Street'],
+    // For councils that publish AADT as a per-year pivot (Hamilton CC, ...)
+    // list Year#### columns most-recent first so first-non-null wins. The
+    // sync also uses the matched alias to back-fill count_date when the
+    // upstream feed has no explicit date column.
+    'aadt'             => [
+        'Year2026', 'Year2025', 'Year2024', 'Year2023', 'Year2022', 'Year2021',
+        'Year2020', 'Year2019', 'Year2018', 'Year2017', 'Year2016', 'Year2015',
+        'Year2014', 'Year2013', 'Year2012', 'Year2011', 'Year2010', 'Year2009',
+        'Year2008', 'Year2007', 'Year2006', 'Year2005', 'Year2004', 'Year2003',
+        'Year2002', 'Year2001', 'Year2000',
+        'aadt', 'AADT', 'adt', 'ADT', 'averageDailyTraffic', 'AverageDailyTraffic',
+        'volume', 'Volume', 'avgDailyVol', 'AvgDailyVol',
+    ],
     'heavy_pct'        => ['percentHeavy', 'PercentHeavy', 'heavy_pct', 'heavyPct', 'HeavyPct', 'percent_heavy', 'hcvPct', 'HCVPct', 'heavy', 'Heavy'],
     'peak_hour_volume' => ['peakHourVolume', 'PeakHourVolume', 'peak_hour_volume', 'peakVolume', 'PeakVolume', 'maxHourVolume'],
     'speed_limit'      => ['speedLimit', 'SpeedLimit', 'speed_limit', 'speedLimitKmh', 'postedSpeed', 'PostedSpeed'],
